@@ -1,0 +1,606 @@
+@import 'tailwindcss';
+
+/* ============================================================
+   Bahasa visual hearme — diadaptasi dari proyek Framer
+   "Therapy that starts where you are" (dibaca via MCP UnFramer):
+   - kertas hangat #FBFAF8 + tinta #12100E sebagai teks utama
+   - abu hangat: body #6E6862, faint #948C83
+   - garis rambut #DEDAD3; panel malam #16140F / #211E19 / #3A352E
+   - Figtree (300–700), tracking rapat pada display
+   Token lama (void/midnight/frost/fog/mist/aurora-*) dipertahankan
+   sebagai alias agar seluruh halaman ikut bertema tanpa diubah.
+   ============================================================ */
+
+@theme {
+  --font-sans: 'Figtree', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Figtree', ui-sans-serif, system-ui, sans-serif;
+
+  /* Palet dasar (referensi Framer) */
+  --color-paper: #fbfaf8;
+  --color-surface: #ffffff;
+  --color-ink: #12100e;
+  --color-body: #6e6862;
+  --color-faint: #948c83;
+  --color-hairline: #dedad3;
+  --color-night: #16140f;
+  --color-night-raised: #211e19;
+  --color-night-line: #3a352e;
+  --color-on-dark: #fbfaf8;
+  --color-on-dark-body: #a8a29a;
+
+  /* Alias token lama — dipakai luas di halaman-halaman app */
+  --color-void: #fbfaf8; /* dulu latar malam → kini kertas */
+  --color-midnight: #ffffff; /* dulu panel gelap → kini kartu putih */
+  --color-frost: #12100e; /* dulu teks terang → kini tinta */
+  --color-fog: #6e6862;
+  --color-mist: #7a7269;
+
+  /* Aksen lama → monokrom hangat editorial */
+  --color-aurora-teal: #12100e;
+  --color-aurora-indigo: #3a352e;
+  --color-aurora-violet: #6e6862;
+  --color-aurora-rose: #a4442f;
+
+  /* Kalibrasi skala Tailwind yang dipakai app ke palet hangat */
+  --color-white: #12100e; /* semua tint `white/N` = tint tinta di atas kertas */
+  --color-teal-100: #2f5d45; /* positif / disetujui (sage) */
+  --color-teal-300: #4a7c5e;
+  --color-indigo-300: #12100e; /* terpilih / aktif → tinta */
+  --color-indigo-400: #12100e;
+  --color-amber-100: #6f4e12; /* menunggu / peringatan (okre) */
+  --color-amber-200: #7d5916;
+  --color-amber-300: #9c7222;
+  --color-amber-400: #b08327;
+  --color-rose-200: #8f3a2b; /* galat / ditolak (terakota) */
+  --color-rose-300: #a4442f;
+  --color-rose-400: #a4442f;
+
+  /* garis kontrol form — cukup gelap agar terlihat (WCAG 1.4.11 ≥3:1) */
+  --color-field-line: #97907f;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  @apply bg-void text-frost antialiased;
+  overflow-x: hidden;
+  min-height: 100dvh;
+}
+
+::selection {
+  background: rgba(18, 16, 14, 0.12);
+}
+
+/* Display: Figtree 500 dengan tracking rapat (gaya /Display/* referensi) */
+.font-display {
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+/* ============ Latar kertas: sapuan hangat + grain ============ */
+.aurora-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.aurora-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: 0.5;
+  will-change: transform;
+}
+
+.aurora-blob--teal {
+  width: 44rem;
+  height: 44rem;
+  left: -14rem;
+  top: -16rem;
+  background: radial-gradient(circle at 35% 35%, rgba(233, 221, 196, 0.9), transparent 65%);
+  animation: aurora-a 52s ease-in-out infinite alternate;
+}
+
+.aurora-blob--indigo {
+  width: 52rem;
+  height: 52rem;
+  right: -18rem;
+  top: -10rem;
+  background: radial-gradient(circle at 50% 45%, rgba(222, 214, 203, 0.85), transparent 65%);
+  animation: aurora-b 64s ease-in-out infinite alternate;
+}
+
+.aurora-blob--violet {
+  width: 46rem;
+  height: 46rem;
+  left: 22%;
+  bottom: -22rem;
+  background: radial-gradient(circle at 50% 50%, rgba(244, 236, 220, 0.9), transparent 68%);
+  animation: aurora-c 58s ease-in-out infinite alternate;
+}
+
+@keyframes aurora-a {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(7rem, 5rem, 0) scale(1.18); }
+}
+
+@keyframes aurora-b {
+  from { transform: translate3d(0, 0, 0) scale(1.05); }
+  to { transform: translate3d(-6rem, 7rem, 0) scale(0.94); }
+}
+
+@keyframes aurora-c {
+  from { transform: translate3d(0, 0, 0) scale(0.96); }
+  to { transform: translate3d(5rem, -6rem, 0) scale(1.12); }
+}
+
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: -9;
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-blob {
+    animation: none !important;
+  }
+}
+
+/* ============ Kartu: bidang putih + garis rambut ============ */
+.card {
+  @apply relative rounded-3xl border p-5;
+  border-color: var(--color-hairline);
+  background: var(--color-surface);
+  box-shadow:
+    0 1px 2px rgba(18, 16, 14, 0.03),
+    0 12px 32px -28px rgba(18, 16, 14, 0.35);
+}
+
+/* ============ Kontrol ============ */
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.btn-ghost {
+  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+.btn-primary {
+  color: var(--color-paper);
+  background: var(--color-night);
+}
+
+.btn-primary:hover {
+  background: #2a2620;
+}
+
+.btn-primary:active {
+  transform: translateY(1px);
+}
+
+.btn-secondary {
+  @apply border text-frost;
+  border-color: var(--color-hairline);
+  background: var(--color-surface);
+}
+
+.btn-secondary:hover {
+  background: #f2efe9;
+}
+
+.btn-danger {
+  @apply border;
+  border-color: rgba(164, 68, 47, 0.35);
+  background: rgba(164, 68, 47, 0.08);
+  color: #8f3a2b;
+}
+
+.btn-danger:hover {
+  background: rgba(164, 68, 47, 0.14);
+}
+
+.btn-ghost {
+  @apply text-fog;
+}
+
+/* Tombol ringkas untuk baris tabel dashboard admin (baris tabel lebih rapat). */
+.btn-sm {
+  @apply min-h-9 gap-1.5 rounded-full px-3.5 py-1.5 text-xs;
+}
+
+.btn-ghost:hover {
+  background: rgba(18, 16, 14, 0.05);
+  color: var(--color-ink);
+}
+
+.input {
+  @apply w-full rounded-xl px-3.5 py-2.5 text-sm text-frost outline-none transition;
+  border: 1px solid var(--color-field-line);
+  background: var(--color-surface);
+}
+
+.input::placeholder {
+  color: var(--color-faint);
+}
+
+.input:focus {
+  border-color: var(--color-ink);
+  box-shadow: 0 0 0 3px rgba(18, 16, 14, 0.08);
+}
+
+select.input option,
+select option {
+  background-color: #ffffff;
+  color: #12100e;
+}
+
+.label {
+  @apply mb-1 block text-sm font-medium text-fog;
+}
+
+/* fokus terlihat di semua kontrol interaktif — tinta di atas kertas */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid rgba(18, 16, 14, 0.85);
+  outline-offset: 2px;
+}
+
+/* ============ Chip ============ */
+.chip {
+  @apply inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium;
+  border-color: var(--color-hairline);
+  background: var(--color-surface);
+  color: var(--color-body);
+}
+
+.chip-teal {
+  @apply inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium;
+  border-color: rgba(74, 124, 94, 0.35);
+  background: rgba(74, 124, 94, 0.1);
+  color: #2f5d45;
+}
+
+.chip-amber {
+  @apply inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium;
+  border-color: rgba(156, 114, 34, 0.35);
+  background: rgba(176, 131, 39, 0.12);
+  color: #6f4e12;
+}
+
+.chip-rose {
+  @apply inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium;
+  border-color: rgba(164, 68, 47, 0.32);
+  background: rgba(164, 68, 47, 0.09);
+  color: #8f3a2b;
+}
+
+/* ============ Util ============ */
+.text-gradient {
+  text-decoration-line: underline;
+  text-decoration-color: rgba(18, 16, 14, 0.28);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.3em;
+}
+
+.logo-mark {
+  @apply grid size-8 place-items-center rounded-[10px];
+  background: var(--color-night);
+  color: var(--color-paper);
+}
+
+/* gelembung chat */
+.bubble-mine {
+  background: var(--color-night);
+  border: 1px solid var(--color-night);
+  color: var(--color-paper);
+}
+
+.bubble-theirs {
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  color: var(--color-ink);
+}
+
+/* reveal lembut antar langkah */
+.reveal {
+  animation: reveal-up 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    animation: none;
+  }
+}
+
+/* Gema: gambar penuh digambar sinkron; kemunculan hanya fade CSS yang andal */
+.gema-fade {
+  animation: gema-in 1600ms ease-out both;
+}
+
+@keyframes gema-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gema-fade {
+    animation: none;
+  }
+}
+
+/* ============ Voice AI: orb — lampu hangat di ruang malam ============ */
+.voice-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 46vh;
+}
+
+.voice-orb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--orb-size, 220px);
+  height: var(--orb-size, 220px);
+}
+
+.voice-orb__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 1px solid rgba(251, 250, 248, 0.18);
+  opacity: 0;
+}
+
+.voice-orb__ring--2 {
+  border-color: rgba(232, 220, 195, 0.16);
+}
+
+.voice-orb__core {
+  width: 46%;
+  height: 46%;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 38% 34%, #fffdf7, #f0e4cc 48%, #d3bf9b);
+  box-shadow: 0 0 60px -8px rgba(240, 228, 204, 0.5);
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 420ms ease, background 420ms ease;
+  animation: orb-breathe 5.2s ease-in-out infinite;
+}
+
+/* AI sedang berbicara */
+.voice-orb[data-state='speaking'] .voice-orb__core {
+  animation: orb-speak 900ms ease-in-out infinite;
+  box-shadow: 0 0 96px -4px rgba(255, 248, 232, 0.7);
+}
+
+.voice-orb[data-state='speaking'] .voice-orb__ring {
+  animation: orb-ripple 2400ms ease-out infinite;
+}
+
+.voice-orb[data-state='speaking'] .voice-orb__ring--2 {
+  animation-delay: 800ms;
+}
+
+/* pengguna sedang berbicara */
+.voice-orb[data-state='listening'] .voice-orb__core {
+  background: radial-gradient(circle at 38% 34%, #fff6e0, #f3ddad 55%, #dcbc80);
+  box-shadow: 0 0 96px -4px rgba(240, 210, 150, 0.6);
+  animation: orb-speak 1100ms ease-in-out infinite;
+}
+
+.voice-orb[data-state='listening'] .voice-orb__ring {
+  border-color: rgba(240, 210, 150, 0.35);
+  animation: orb-ripple 1800ms ease-out infinite;
+}
+
+/* AI sedang berpikir */
+.voice-orb[data-state='thinking'] .voice-orb__core {
+  animation: orb-speak 1600ms ease-in-out infinite;
+}
+
+.voice-orb__bars {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 30%;
+  opacity: 0;
+  transition: opacity 260ms ease;
+}
+
+.voice-orb[data-state='speaking'] .voice-orb__bars,
+.voice-orb[data-state='listening'] .voice-orb__bars {
+  opacity: 1;
+}
+
+.voice-orb__bars span {
+  display: block;
+  width: 4px;
+  height: 22%;
+  border-radius: 9999px;
+  background: #16140f;
+  transform-origin: center;
+  animation: orb-bar 900ms ease-in-out infinite;
+  animation-delay: calc(var(--i) * 110ms);
+}
+
+@keyframes orb-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.045); }
+}
+
+@keyframes orb-speak {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.14); }
+}
+
+@keyframes orb-ripple {
+  0% { transform: scale(0.62); opacity: 0.75; }
+  100% { transform: scale(1.25); opacity: 0; }
+}
+
+@keyframes orb-bar {
+  0%, 100% { height: 22%; }
+  50% { height: 78%; }
+}
+
+/* ============ Transisi antar fitur ============ */
+.stage-enter {
+  animation: stage-in 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes stage-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.stage-leave {
+  animation: stage-out 620ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes stage-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.06); filter: blur(6px); }
+}
+
+/* ============ Immersive: layar suara = ruang malam hangat ============
+   Hanya halaman voice yang memakai kelas ini. Token didefinisikan
+   ulang di dalamnya sehingga seluruh utility Tailwind (text-frost,
+   bg-white/N, chip, card, input) otomatis menyesuaikan ke malam. */
+.immersive {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 2rem 1.25rem 2.5rem;
+  background-color: var(--color-night);
+  background-image: radial-gradient(1100px 720px at 50% -8%, rgba(255, 244, 222, 0.07), transparent 62%);
+  color: var(--color-on-dark);
+  color-scheme: dark;
+
+  /* token malam */
+  --color-frost: #fbfaf8;
+  --color-fog: #a8a29a;
+  --color-mist: #8a8378;
+  --color-body: #a8a29a;
+  --color-faint: #8a8378;
+  --color-hairline: #3a352e;
+  --color-surface: #211e19;
+  --color-white: #fbfaf8;
+  --color-aurora-teal: #f0e6d2;
+  --color-aurora-indigo: #d9c9a8;
+  --color-aurora-violet: #c9b48e;
+  --color-teal-100: #cfc4ae;
+  --color-teal-300: #e8dcbe;
+  --color-indigo-300: #d9c9a8;
+  --color-amber-100: #f0dfb4;
+  --color-amber-200: #e2c98d;
+  --color-amber-300: #e8c87a;
+  --color-amber-400: #e8c87a;
+  --color-rose-200: #e8b4a4;
+  --color-rose-300: #e8b4a4;
+  --color-rose-400: #a4442f;
+  --color-field-line: #786f5e;
+}
+
+.immersive .card {
+  box-shadow: none;
+}
+
+.immersive .btn-primary:hover {
+  background: #ffffff;
+}
+
+.immersive .btn-secondary {
+  background: transparent;
+}
+
+.immersive .btn-secondary:hover {
+  background: rgba(251, 250, 248, 0.08);
+}
+
+.immersive .btn-danger {
+  border-color: rgba(232, 180, 164, 0.3);
+  background: rgba(164, 68, 47, 0.22);
+  color: #e8b4a4;
+}
+
+.immersive .btn-danger:hover {
+  background: rgba(164, 68, 47, 0.32);
+}
+
+.immersive .btn-ghost:hover {
+  background: rgba(251, 250, 248, 0.06);
+  color: var(--color-on-dark);
+}
+
+.immersive .input:focus {
+  border-color: rgba(251, 250, 248, 0.5);
+  box-shadow: 0 0 0 3px rgba(251, 250, 248, 0.12);
+}
+
+.immersive .logo-mark {
+  background: var(--color-paper);
+  color: var(--color-night);
+}
+
+.immersive .text-gradient {
+  text-decoration-color: rgba(240, 230, 210, 0.4);
+}
+
+.immersive ::selection {
+  background: rgba(251, 250, 248, 0.22);
+}
+
+.immersive :is(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline-color: rgba(251, 250, 248, 0.85);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-orb__core,
+  .voice-orb__ring,
+  .voice-orb__bars span {
+    animation: none !important;
+  }
+  .stage-enter,
+  .stage-leave {
+    animation-duration: 1ms !important;
+  }
+}
