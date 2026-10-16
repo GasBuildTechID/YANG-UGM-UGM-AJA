@@ -9,6 +9,15 @@ function isRateLimited(ip) {
   const windowMs = 60 * 1000;
   const maxAttempts = 5;
 
+  // Bersihkan entri lama jika Map mulai menumpuk
+  if (attempts.size > 200) {
+    for (const [key, timestamps] of attempts.entries()) {
+      const active = timestamps.filter((t) => now - t < windowMs);
+      if (active.length === 0) attempts.delete(key);
+      else attempts.set(key, active);
+    }
+  }
+
   const userAttempts = attempts.get(ip) || [];
   const recent = userAttempts.filter((t) => now - t < windowMs);
 

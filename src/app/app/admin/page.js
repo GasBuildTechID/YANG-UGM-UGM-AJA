@@ -27,8 +27,6 @@ import { useSession } from '@/components/SessionProvider';
 import {
   APPLICATION_BADGE_LABELS,
   PROOF_TYPE_LABELS,
-  REPORT_REASON_LABELS,
-  REPORT_STATUS_LABELS,
   formatDateTime,
 } from '@/lib/labels';
 import { proofSignedUrl } from '@/lib/volunteer';
@@ -37,7 +35,6 @@ import { proofSignedUrl } from '@/lib/volunteer';
 const SECTIONS = [
   { key: 'ringkasan', label: 'Ringkasan', icon: LayoutDashboard, hint: 'Angka operasional harian' },
   { key: 'relawan', label: 'Relawan', icon: Users, hint: 'Pendaftaran & verifikasi relawan' },
-  { key: 'laporan', label: 'Laporan', icon: ShieldAlert, hint: 'Laporan pengguna yang perlu ditinjau' },
   { key: 'konfigurasi', label: 'Konfigurasi', icon: Settings2, hint: 'Nilai operasional layanan' },
 ];
 
@@ -46,13 +43,6 @@ const APP_BADGE = {
   approved: 'chip-teal',
   rejected: 'chip-rose',
   suspended: 'chip-rose',
-};
-
-const REPORT_BADGE = {
-  open: 'chip-amber',
-  reviewed: 'chip-teal',
-  actioned: 'chip-teal',
-  dismissed: 'chip',
 };
 
 const FILTERS = [
@@ -77,7 +67,6 @@ export default function AdminPage() {
 
   const [section, setSection] = useState('ringkasan');
   const [applications, setApplications] = useState([]);
-  const [reports, setReports] = useState([]);
   const [stats, setStats] = useState(null);
   const [config, setConfig] = useState(null);
   const [loadingPage, setLoadingPage] = useState(true);
@@ -89,19 +78,17 @@ export default function AdminPage() {
   const [query, setQuery] = useState('');
 
   const load = useCallback(async () => {
-    const [{ data: apps }, { data: reps }, { data: st }, { data: cfg }] = await Promise.all([
+    const [{ data: apps }, { data: st }, { data: cfg }] = await Promise.all([
       supabase
         .from('volunteer_applications')
         .select('*, users!volunteer_applications_user_id_fkey(display_name, email)')
         .order('created_at', { ascending: false })
         .limit(50),
-      supabase.from('reports').select('*').order('created_at', { ascending: false }).limit(50),
       supabase.rpc('admin_stats'),
       supabase.from('app_config').select('*'),
     ]);
 
     setApplications(apps || []);
-    setReports(reps || []);
     setStats(st || null);
     if (cfg) {
       setConfig(Object.fromEntries(cfg.map((c) => [c.key, c.value])));
@@ -132,21 +119,6 @@ export default function AdminPage() {
         .from('volunteer_presence')
         .upsert({ volunteer_id: app.user_id, status: 'offline', last_seen_at: new Date().toISOString() });
     }
-    setBusyId('');
-    if (err) {
-      setError(err.message);
-      return;
-    }
-    load();
-  }
-
-  async function reviewReport(report, status) {
-    setBusyId(report.id);
-    setError('');
-    const { error: err } = await supabase
-      .from('reports')
-      .update({ status, reviewed_by: profile.id, reviewed_at: new Date().toISOString() })
-      .eq('id', report.id);
     setBusyId('');
     if (err) {
       setError(err.message);
@@ -198,7 +170,6 @@ export default function AdminPage() {
   }
 
   const pending = useMemo(() => applications.filter((a) => a.status === 'pending'), [applications]);
-  const openReports = useMemo(() => reports.filter((r) => r.status === 'open'), [reports]);
 
   // Filter status + pencarian nama/email, dihitung di klien (data sudah dimuat).
   const filteredApplications = useMemo(() => {
@@ -211,12 +182,6 @@ export default function AdminPage() {
       return name.includes(q) || email.includes(q);
     });
   }, [applications, filter, query]);
-
-  // Laporan terbuka tampil lebih dulu — itu yang butuh tindakan.
-  const sortedReports = useMemo(() => {
-    const rank = { open: 0, reviewed: 1, actioned: 2, dismissed: 3 };
-    return [...reports].sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9));
-  }, [reports]);
 
   if (loading || loadingPage) {
     return (
@@ -247,7 +212,7 @@ export default function AdminPage() {
         { label: 'Relawan aktif', value: stats.volunteers_available, hint: 'siap menerima sesi', icon: HeartPulse, tone: stats.volunteers_available > 0 ? 'teal' : 'plain' },
         { label: 'Sesi berjalan', value: stats.sessions_active, hint: 'grup + berdua', icon: Activity, tone: stats.sessions_active > 0 ? 'teal' : 'plain' },
         { label: 'Pendaftar menunggu', value: stats.applications_pending, hint: 'perlu diverifikasi', icon: Users, tone: stats.applications_pending > 0 ? 'amber' : 'plain' },
-        { label: 'Laporan terbuka', value: stats.reports_open, hint: 'perlu ditinjau', icon: AlertTriangle, tone: stats.reports_open > 0 ? 'amber' : 'plain' },
+        { label: 'Check-in membaik', value: stats.checkins_lebih_baik, hint: 'umpan balik positif', icon: HeartPulse, tone: stats.checkins_lebih_baik > 0 ? 'teal' : 'plain' },
       ]
     : [];
 
@@ -327,7 +292,7 @@ export default function AdminPage() {
           {SECTIONS.map((s) => {
             const Icon = s.icon;
             const active = s.key === section;
-            const badge = s.key === 'relawan' ? pending.length : s.key === 'laporan' ? openReports.length : 0;
+            const badge = s.key === 'relawan' ? pending.length : 0;
             return (
               <button
                 key={s.key}
@@ -417,7 +382,7 @@ export default function AdminPage() {
             {SECTIONS.map((s) => {
               const Icon = s.icon;
               const active = s.key === section;
-              const badge = s.key === 'relawan' ? pending.length : s.key === 'laporan' ? openReports.length : 0;
+              const badge = s.key === 'relawan' ? pending.length : 0;
               return (
                 <button
                   key={s.key}
@@ -463,7 +428,7 @@ export default function AdminPage() {
                   <h2 className="flex items-center gap-2 font-bold text-frost">
                     <ClipboardList className="size-4 text-aurora-teal" /> Perlu tindakan
                   </h2>
-                  {pending.length === 0 && openReports.length === 0 ? (
+                  {pending.length === 0 ? (
                     <p className="mt-3 flex items-center gap-2 text-sm text-fog">
                       <CircleCheck className="size-4 text-aurora-teal" /> Tidak ada yang menunggu tindakan.
                     </p>
@@ -475,16 +440,6 @@ export default function AdminPage() {
                             <strong>{pending.length}</strong> pendaftar relawan menunggu verifikasi
                           </span>
                           <button type="button" className="btn-secondary" onClick={() => setSection('relawan')}>
-                            Tinjau
-                          </button>
-                        </li>
-                      )}
-                      {openReports.length > 0 && (
-                        <li className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/3 px-3 py-2.5">
-                          <span className="text-sm text-frost">
-                            <strong>{openReports.length}</strong> laporan pengguna terbuka
-                          </span>
-                          <button type="button" className="btn-secondary" onClick={() => setSection('laporan')}>
                             Tinjau
                           </button>
                         </li>
@@ -606,81 +561,6 @@ export default function AdminPage() {
                   </div>
                 ))}
                 {filteredApplications.length === 0 && <p className="card text-center text-sm text-mist">Tidak ada pendaftar yang cocok.</p>}
-              </div>
-            </div>
-          )}
-
-          {/* ============ Laporan ============ */}
-          {section === 'laporan' && (
-            <div className="space-y-4">
-              <div className="card hidden overflow-hidden p-0 md:block">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-white/8 text-left text-[11px] uppercase tracking-wider text-mist">
-                      <th className="px-4 py-3 font-semibold">Alasan</th>
-                      <th className="px-4 py-3 font-semibold">Sesi</th>
-                      <th className="px-4 py-3 font-semibold">Waktu</th>
-                      <th className="px-4 py-3 font-semibold">Status</th>
-                      <th className="px-4 py-3 font-semibold">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedReports.map((r) => (
-                      <tr key={r.id} className="border-b border-white/6 last:border-0 align-top hover:bg-white/3">
-                        <td className="px-4 py-3">
-                          <p className="font-semibold text-frost">{REPORT_REASON_LABELS[r.reason_category] || r.reason_category}</p>
-                          {r.note && <p className="mt-1 max-w-md text-xs text-fog">{r.note}</p>}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-fog">{r.session_id ? r.session_id.slice(0, 8) : '—'}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-xs text-fog">{formatDateTime(r.created_at)}</td>
-                        <td className="px-4 py-3">
-                          <span className={REPORT_BADGE[r.status] || 'chip'}>{REPORT_STATUS_LABELS[r.status] || r.status}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          {r.status === 'open' ? (
-                            <div className="flex gap-2">
-                              <button type="button" className="btn-secondary btn-sm" onClick={() => reviewReport(r, 'reviewed')} disabled={busyId === r.id}>
-                                Tandai ditinjau
-                              </button>
-                              <button type="button" className="btn-danger btn-sm" onClick={() => reviewReport(r, 'actioned')} disabled={busyId === r.id}>
-                                Sudah ditindaklanjuti
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-mist">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {sortedReports.length === 0 && <p className="px-4 py-6 text-center text-sm text-mist">Belum ada laporan pengguna.</p>}
-              </div>
-
-              <div className="space-y-3 md:hidden">
-                {sortedReports.map((r) => (
-                  <div key={r.id} className="card">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <p className="font-semibold text-frost">{REPORT_REASON_LABELS[r.reason_category] || r.reason_category}</p>
-                      <span className={REPORT_BADGE[r.status] || 'chip'}>{REPORT_STATUS_LABELS[r.status] || r.status}</span>
-                    </div>
-                    <p className="mt-1 text-xs text-fog">
-                      Sesi {r.session_id ? r.session_id.slice(0, 8) : '—'} · {formatDateTime(r.created_at)}
-                    </p>
-                    {r.note && <p className="mt-2 rounded-lg bg-white/5 p-2 text-sm text-fog">{r.note}</p>}
-                    {r.status === 'open' && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button type="button" className="btn-secondary" onClick={() => reviewReport(r, 'reviewed')} disabled={busyId === r.id}>
-                          Tandai ditinjau
-                        </button>
-                        <button type="button" className="btn-danger" onClick={() => reviewReport(r, 'actioned')} disabled={busyId === r.id}>
-                          Sudah ditindaklanjuti
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {sortedReports.length === 0 && <p className="card text-center text-sm text-mist">Belum ada laporan pengguna.</p>}
               </div>
             </div>
           )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowDown, ArrowRight } from 'lucide-react';
 import { MotionConfig, motion } from 'motion/react';
@@ -8,6 +8,7 @@ import GenerativeArt from '@/components/GenerativeArt';
 import Logo from '@/components/Logo';
 import { useSession } from '@/components/SessionProvider';
 import AuthModal from '@/components/AuthModal';
+import { getTimeGreeting } from '@/lib/time';
 
 // ===== Halaman depan: hero malam + bagian "cara kerja" editorial =====
 // Tata letak mengikuti referensi editorial: nav tiga zona (merek / tautan / aksi),
@@ -19,13 +20,11 @@ import AuthModal from '@/components/AuthModal';
 
 const EASE = [0.22, 1, 0.36, 1];
 
-const MotionLink = motion.create(Link);
-
 const STEPS = [
   {
     label: 'Cerita & gema',
-    title: 'Tulis atau ucapkan malammu',
-    body: 'Tarik napas, lalu ceritakan apa adanya. Kata-katamu tumbuh menjadi gema — karya abstrak yang hanya milikmu.',
+    title: 'Tulis atau ucapkan harimu',
+    body: 'Tarik napas, lalu ceritakan apa adanya. Kata-katamu tumbuh menjadi gema — karya visual abstrak yang hanya milikmu.',
   },
   {
     label: 'Teman bicara',
@@ -35,7 +34,7 @@ const STEPS = [
   {
     label: 'Kendali',
     title: 'Diam dan keluar selalu boleh',
-    body: 'Tanpa transkrip. Yang tersimpan hanya ringkasan yang kamu setujui. Laporan ditangani manusia, bukan dibiarkan.',
+    body: 'Tanpa transkrip rekaman suara. Yang tersimpan hanya ringkasan yang kamu setujui. Ruang terlindungi moderasi otomatis.',
   },
 ];
 
@@ -57,6 +56,11 @@ const reveal = (delay = 0) => ({
 export default function LandingPage() {
   const { user, profile } = useSession();
   const [authModal, setAuthModal] = useState({ open: false, mode: 'login' });
+  const [greeting, setGreeting] = useState('Malam');
+
+  useEffect(() => {
+    setGreeting(getTimeGreeting());
+  }, []);
 
   const startHref = user ? (profile?.role === 'admin' ? '/app/admin' : '/app/voice') : '#';
   const startLabel = user ? 'Buka ruangmu' : 'Mulai bercerita';
@@ -128,9 +132,10 @@ export default function LandingPage() {
             <div className="flex flex-1 flex-col items-center justify-center py-10 text-center">
               <motion.h1
                 className="max-w-3xl font-display text-[clamp(2.5rem,6vw,4.5rem)] leading-[1.06] tracking-tight text-balance"
+                suppressHydrationWarning
                 {...rise(0.08)}
               >
-                Malam ini terasa berat?
+                {greeting} ini terasa berat?
                 <br />
                 <span className="italic">Titipkan sebentar di sini.</span>
               </motion.h1>
@@ -139,15 +144,15 @@ export default function LandingPage() {
               </motion.p>
               <motion.div className="mt-9 flex items-center justify-center" {...rise(0.28)}>
                 {user ? (
-                  <MotionLink
-                    href={startHref}
-                    whileHover={{ y: -2 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="inline-flex min-h-12 items-center gap-2.5 rounded-full bg-on-dark px-7 text-sm font-medium text-ink shadow-sm transition-colors hover:bg-[#f2efe9]"
-                  >
-                    {startLabel}
-                    <ArrowRight className="size-4" />
-                  </MotionLink>
+                  <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
+                    <Link
+                      href={startHref}
+                      className="inline-flex min-h-12 items-center gap-2.5 rounded-full bg-on-dark px-7 text-sm font-medium text-ink shadow-sm transition-colors hover:bg-[#f2efe9]"
+                    >
+                      {startLabel}
+                      <ArrowRight className="size-4" />
+                    </Link>
+                  </motion.div>
                 ) : (
                   <motion.button
                     type="button"
@@ -234,15 +239,15 @@ export default function LandingPage() {
             </motion.p>
             <motion.div className="mt-8 flex flex-col items-center justify-center gap-4" {...reveal(0.16)}>
               {user ? (
-                <MotionLink
-                  href={startHref}
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="inline-flex min-h-12 items-center gap-2.5 rounded-full bg-on-dark px-7 text-sm font-medium text-ink shadow-sm transition-colors hover:bg-[#f2efe9]"
-                >
-                  {startLabel}
-                  <ArrowRight className="size-4" />
-                </MotionLink>
+                <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
+                  <Link
+                    href={startHref}
+                    className="inline-flex min-h-12 items-center gap-2.5 rounded-full bg-on-dark px-7 text-sm font-medium text-ink shadow-sm transition-colors hover:bg-[#f2efe9]"
+                  >
+                    {startLabel}
+                    <ArrowRight className="size-4" />
+                  </Link>
+                </motion.div>
               ) : (
                 <motion.button
                   type="button"

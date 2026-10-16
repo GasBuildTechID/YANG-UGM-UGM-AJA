@@ -7,7 +7,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, BookOpen, Mic, RotateCcw, ShieldAlert, Sparkles } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  BookOpen,
+  CheckCircle2,
+  HeartHandshake,
+  Mic,
+  RotateCcw,
+  ShieldAlert,
+  Sparkles,
+  Users,
+} from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useSession } from '@/components/SessionProvider';
 import CrisisBanner from '@/components/CrisisBanner';
@@ -204,20 +215,24 @@ export default function IntakeResultPage() {
               <div>
                 <span className="label">Yang paling kamu butuhkan</span>
                 <div className="flex flex-wrap gap-2">
-                  {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setEdited({ ...edited, suggested_category: value })}
-                      className={`rounded-full border px-3.5 py-2 text-sm transition ${
-                        edited.suggested_category === value
-                          ? 'border-indigo-300/50 bg-indigo-300/15 text-frost'
-                          : 'border-white/10 bg-white/4 text-fog hover:bg-white/8'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
+                  {Object.entries(CATEGORY_LABELS).map(([value, label]) => {
+                    const active = edited.suggested_category === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setEdited({ ...edited, suggested_category: value })}
+                        className={`flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm transition-all duration-200 ${
+                          active
+                            ? 'border-indigo-300/50 bg-indigo-300/15 text-frost shadow-[0_0_12px_rgba(180,180,240,0.15)] ring-1 ring-indigo-300/30'
+                            : 'border-white/10 bg-white/4 text-fog hover:border-white/20 hover:bg-white/8 hover:text-frost'
+                        }`}
+                      >
+                        {active && <CheckCircle2 className="size-3.5 text-aurora-teal" />}
+                        <span>{label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
                 <p className="mt-1.5 text-xs text-mist">{CATEGORY_DESCRIPTIONS[edited.suggested_category]}</p>
               </div>
@@ -309,40 +324,52 @@ export default function IntakeResultPage() {
               type="button"
               disabled={busy}
               onClick={() => startQueue('group')}
-              className={`rounded-3xl border p-5 text-left transition ${
+              className={`group relative rounded-3xl border p-5 text-left transition-all duration-300 ${
                 edited.suggested_mode === 'group'
-                  ? 'border-indigo-300/50 bg-indigo-300/12'
-                  : 'border-white/10 bg-white/4 hover:border-indigo-300/30 hover:bg-white/8'
+                  ? 'border-indigo-300/50 bg-indigo-300/12 shadow-[0_0_24px_rgba(180,180,240,0.12)]'
+                  : 'border-white/10 bg-white/4 hover:border-indigo-300/30 hover:bg-white/8 hover:translate-y-[-2px]'
               }`}
             >
-              <span className="chip-teal">Lingkaran kecil</span>
-              <h3 className="mt-3 font-display text-lg">3–4 mahasiswa, saling menjaga</h3>
-              <p className="mt-1.5 text-sm text-fog">Berpanduan. Boleh hanya mendengarkan.</p>
-              {edited.suggested_mode === 'group' && (
-                <span className="mt-2 inline-block text-xs font-semibold text-aurora-teal">
-                  Paling dekat dengan ceritamu
+              <div className="flex items-center justify-between">
+                <span className="chip-teal flex items-center gap-1.5">
+                  <Users className="size-3.5" /> Lingkaran kecil
                 </span>
-              )}
+                {edited.suggested_mode === 'group' && (
+                  <span className="rounded-full bg-teal-300/10 px-2 py-0.5 text-[11px] font-medium text-aurora-teal">
+                    Paling cocok
+                  </span>
+                )}
+              </div>
+              <h3 className="mt-3 font-display text-lg text-frost transition group-hover:text-white">
+                3–4 mahasiswa, saling menjaga
+              </h3>
+              <p className="mt-1.5 text-sm text-fog">Berpanduan terstruktur. Boleh hanya mendengarkan.</p>
             </button>
 
             <button
               type="button"
               disabled={busy}
               onClick={() => startQueue('one_to_one')}
-              className={`rounded-3xl border p-5 text-left transition ${
+              className={`group relative rounded-3xl border p-5 text-left transition-all duration-300 ${
                 edited.suggested_mode === 'one_to_one'
-                  ? 'border-indigo-300/50 bg-indigo-300/12'
-                  : 'border-white/10 bg-white/4 hover:border-indigo-300/30 hover:bg-white/8'
+                  ? 'border-indigo-300/50 bg-indigo-300/12 shadow-[0_0_24px_rgba(180,180,240,0.12)]'
+                  : 'border-white/10 bg-white/4 hover:border-indigo-300/30 hover:bg-white/8 hover:translate-y-[-2px]'
               }`}
             >
-              <span className="chip-teal">Berdua</span>
-              <h3 className="mt-3 font-display text-lg">Ditemani relawan yang siap mendengar</h3>
-              <p className="mt-1.5 text-sm text-fog">Relawan terverifikasi. Tak cocok? Ada pilihan lain.</p>
-              {edited.suggested_mode === 'one_to_one' && (
-                <span className="mt-2 inline-block text-xs font-semibold text-aurora-teal">
-                  Paling dekat dengan ceritamu
+              <div className="flex items-center justify-between">
+                <span className="chip-teal flex items-center gap-1.5">
+                  <HeartHandshake className="size-3.5" /> Berdua
                 </span>
-              )}
+                {edited.suggested_mode === 'one_to_one' && (
+                  <span className="rounded-full bg-teal-300/10 px-2 py-0.5 text-[11px] font-medium text-aurora-teal">
+                    Paling cocok
+                  </span>
+                )}
+              </div>
+              <h3 className="mt-3 font-display text-lg text-frost transition group-hover:text-white">
+                Ditemani relawan yang siap mendengar
+              </h3>
+              <p className="mt-1.5 text-sm text-fog">Relawan terverifikasi. Ruang bicara privat dan empatik.</p>
             </button>
           </div>
 

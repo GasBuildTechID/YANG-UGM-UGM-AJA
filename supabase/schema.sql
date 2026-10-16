@@ -558,7 +558,7 @@ begin
 end;
 $$;
 
--- Peserta menyetujui relawan bergabung (ubah jadi terapi grup); semua peserta harus setuju.
+-- Peserta menyetujui relawan bergabung (ubah jadi terapi grup); semua peserta aktif harus setuju.
 create or replace function public.approve_volunteer_join(p_session_id uuid)
 returns jsonb
 language plpgsql security definer set search_path = public
@@ -585,12 +585,15 @@ begin
          count(*)
     into v_pending, v_all
     from public.session_participants
-   where session_id = p_session_id and participant_role = 'member';
+   where session_id = p_session_id and participant_role = 'member' and left_at is null;
 
   if v_pending = 0 then
-    insert into public.session_participants (session_id, user_id, participant_role)
-    values (p_session_id, v_facilitator, 'facilitator')
-    on conflict (session_id, user_id) do update set left_at = null;
+    insert into public.session_participants (session_id, user_id, participant_role, consent_to_joined_volunteer_at)
+    values (p_session_id, v_facilitator, 'facilitator', now())
+    on conflict (session_id, user_id) do update
+      set left_at = null,
+          participant_role = 'facilitator',
+          consent_to_joined_volunteer_at = now();
 
     update public.sessions set volunteer_consent_approved = true where id = p_session_id;
     update public.volunteer_presence set status = 'busy', last_seen_at = now() where volunteer_id = v_facilitator;

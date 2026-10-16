@@ -180,7 +180,7 @@ export default function AuthModal({ isOpen, initialMode = 'login', onClose }) {
             </h1>
             <p className="mt-1 text-xs text-fog">
               <MoonStar className="mr-1 inline size-3.5" />
-              Malam ini tidak harus dijalani sendirian.
+              Hari ini tidak harus kamu jalani sendirian.
             </p>
 
             <form onSubmit={handleLogin} className="mt-5 space-y-3.5">
@@ -246,7 +246,7 @@ export default function AuthModal({ isOpen, initialMode = 'login', onClose }) {
         ) : (
           <div>
             <h1 className="mt-4 font-display text-2xl font-light">
-              Buat ruangmu <span className="text-gradient italic">malam ini.</span>
+              Buat ruangmu <span className="text-gradient italic">sekarang.</span>
             </h1>
             <p className="mt-1 text-xs text-fog">Nama samaran boleh.</p>
 

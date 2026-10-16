@@ -20,7 +20,7 @@
 //   - izin mikrofon diminta eksplisit supaya sebab kegagalan bisa ditampilkan;
 //   - pengguna tidak boleh terjebak: setelah 2 kegagalan, muncul input teks.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -48,6 +48,8 @@ import {
   matchOptionFromSpeech,
   processVoiceTurn,
   INTAKE_STORAGE_KEY,
+  getAdaptiveVoiceQuestions,
+  getVoiceGreeting,
 } from '@/lib/intake';
 import {
   createRecognizer,
@@ -106,8 +108,9 @@ export default function VoiceIntakePage() {
   const indexRef = useRef(0); // giliran aktif (ref: callback lintas-render harus baca nilai terbaru)
   const aliveRef = useRef(true); // false saat komponen dilepas / mulai ulang
 
-  const question = VOICE_QUESTIONS[index] || null;
-  const total = VOICE_QUESTIONS.length;
+  const voiceQuestions = useMemo(() => getAdaptiveVoiceQuestions(), []);
+  const question = voiceQuestions[index] || null;
+  const total = voiceQuestions.length;
 
   // Dukungan browser diperiksa setelah mount (hindari beda render server/klien)
   useEffect(() => {
@@ -282,7 +285,7 @@ export default function VoiceIntakePage() {
   function handleUserSpeech(rawText) {
     const text = String(rawText || '').trim();
     const turnIndex = indexRef.current;
-    const currentQuestion = VOICE_QUESTIONS[turnIndex] || null;
+    const currentQuestion = voiceQuestions[turnIndex] || null;
     if (!text || !currentQuestion || busyRef.current) return;
     busyRef.current = true;
     listeningRef.current = false;
@@ -297,7 +300,7 @@ export default function VoiceIntakePage() {
     setTurns((prev) => [...prev, { role: 'user', text }]);
 
     const isLast = turnIndex + 1 >= total;
-    const nextQuestion = isLast ? null : VOICE_QUESTIONS[turnIndex + 1].question;
+    const nextQuestion = isLast ? null : voiceQuestions[turnIndex + 1].question;
 
     // Proses giliran suara: toleransi kesalahan fonetik STT, tebak maksud dari konteks, dan jawab 2-3 kalimat santai tanpa markdown
     const turnResult = processVoiceTurn({
@@ -362,7 +365,7 @@ export default function VoiceIntakePage() {
     speakingRef.current = false;
     listeningRef.current = false;
     setPhase('talk');
-    const greeting = `${VOICE_GREETING} ${VOICE_QUESTIONS[0].question}`;
+    const greeting = `${getVoiceGreeting()} ${voiceQuestions[0].question}`;
     later(() => say(greeting, listen), 150);
   }
 
@@ -383,6 +386,18 @@ export default function VoiceIntakePage() {
     recognizerRef.current?.abort();
     clearTurnTimers();
     listen();
+  }
+
+  function handleMicClick() {
+    if (speakingRef.current) {
+      interrupt();
+    } else if (listeningRef.current) {
+      recognizerRef.current?.stop();
+    } else {
+      setMicProblem('');
+      listeningRef.current = false;
+      listen();
+    }
   }
 
   function toggleVoice() {
@@ -529,7 +544,7 @@ export default function VoiceIntakePage() {
         {phase === 'talk' && (
           <div className="w-full space-y-5">
             <div className="flex items-center justify-center gap-2" aria-hidden="true">
-              {VOICE_QUESTIONS.map((_, i) => (
+              {voiceQuestions.map((_, i) => (
                 <span
                   key={i}
                   className={`h-1.5 rounded-full transition-all duration-500 ${
@@ -574,7 +589,7 @@ export default function VoiceIntakePage() {
             <div className="flex flex-col items-center gap-3">
               <button
                 type="button"
-                onClick={speaking ? interrupt : listening ? () => recognizerRef.current?.stop() : listen}
+                onClick={handleMicClick}
                 disabled={!speechReady}
                 className={`flex size-20 items-center justify-center rounded-full border transition ${
                   listening
@@ -620,7 +635,15 @@ export default function VoiceIntakePage() {
                 <div className="w-full max-w-md rounded-2xl border border-amber-300/25 bg-amber-300/10 p-3 text-left">
                   <p className="text-sm text-amber-100">{micProblem}</p>
                   {speechReady && (
-                    <button type="button" className="btn-ghost mt-2" onClick={() => listen()}>
+                    <button
+                      type="button"
+                      className="btn-ghost mt-2"
+                      onClick={() => {
+                        setMicProblem('');
+                        listeningRef.current = false;
+                        listen();
+                      }}
+                    >
                       <Mic className="size-4" /> Coba nyalakan mikrofon lagi
                     </button>
                   )}
@@ -692,13 +715,13 @@ export default function VoiceIntakePage() {
                 <span className="text-gradient italic">Kata-katamu sudah tumbuh.</span>
               </h2>
               <p className="mx-auto max-w-md text-sm text-fog">
-                Tiga pertanyaan selesai. Selanjutnya, lihat apa yang kami dengar — lalu pilih cara
-                melewati malam ini.
+                Tiga pertanyaan selesai. Selanjutnya, lihat apa yang kami dengar — lalu pilih ruang
+                pendamping yang paling cocok.
               </p>
             </div>
 
             <ul className="mx-auto max-w-sm space-y-2 text-left">
-              {VOICE_QUESTIONS.map((q) => (
+              {voiceQuestions.map((q) => (
                 <li
                   key={q.key}
                   className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/4 px-4 py-2.5 text-sm"

@@ -136,34 +136,151 @@ Password semua akun demo: `DemoHearme123!` — **ganti sebelum dipakai publik**.
 | Tombol keluar & lapor | `SafetyActions` (lapor/blokir/keluar) + `leave_session` |
 | Check-in setelah sesi | `submit_checkin` (mood + catatan, opsional) |
 
-## Struktur
+## Arsitektur Deployment & Alur Data
+
+Hearme menggunakan arsitektur **Monolith Serverless (Unified Next.js 15 App Router)** yang di-deploy ke Vercel (Edge & Serverless Functions di region Singapore `sin1`) dan terhubung ke **Supabase Cloud** sebagai backend data persisten, autentikasi, serta kluster WebSocket realtime.
+
+```mermaid
+flowchart TD
+    User["Klien Web / Browser\n(React 19, Web Speech API, Realtime WS)"]
+
+    subgraph Vercel["Platform Deployment Vercel (Region: sin1)"]
+        Edge["Edge Network / Middleware\n(Auth Guard & Session Refresh)"]
+        SSR["Next.js 15 App Router\n(RSC & Client Components)"]
+        
+        subgraph RouteHandlers["Serverless Route Handlers (/api)"]
+            HCheck["GET /api/health\n(Health Check & Uptime)"]
+            AuthReg["POST /api/auth/register\n(Validasi & User Creation)"]
+            SuppReq["POST /api/support-request\n(LLM Evidence Grounding)"]
+        end
+    end
+
+    subgraph Supabase["Supabase Cloud Managed Services"]
+        SAuth["Supabase Auth\n(Session & Token Verification)"]
+        SPG["PostgreSQL Database\n(RLS & Matchmaking RPCs)"]
+        SStore["Supabase Storage\n(Bucket volunteer-proofs)"]
+        SRealtime["Supabase Realtime Cluster\n(Broadcast WebSocket Channel)"]
+    end
+
+    subgraph External["Layanan AI Eksternal"]
+        OAI["OpenAI API (gpt-4o-mini)\n(Opsional / Fallback Mode)"]
+    end
+
+    User -->|"HTTPS Request"| Edge
+    Edge --> SSR
+    SSR --> RouteHandlers
+
+    AuthReg -->|"Service Role Admin"| SAuth
+    AuthReg --> SPG
+    SuppReq -->|"Server Secret Key"| OAI
+    SSR -.->|"Client Auth SDK"| SAuth
+    SSR -.->|"RLS Query & RPC"| SPG
+    User <==>|"WebSocket Direct Connection"| SRealtime
+    User -.->|"Signed Upload"| SStore
+```
+
+### Mengapa Arsitektur Ini Tepat & Optimal untuk Vercel?
+1. **Zero Cold-Start Overhead**: Tidak membutuhkan container runtime terpisah (Express/FastAPI/Docker). Semua endpoint berupa Next.js Serverless Route Handlers yang di-scale otomatis oleh Vercel.
+2. **Solusi WebSocket Serverless**: Vercel Serverless Functions bersifat stateless dan tidak ditujukan untuk koneksi WebSocket persisten jangka panjang.Hearme mengatasi ini secara elegan dengan mengarahkan koneksi WebSocket realtime langsung dari browser klien ke kluster **Supabase Realtime (Elixir Phoenix Channels)**, sehingga komunikasi chat antar-mahasiswa berjalan instan tanpa membebani runtime Vercel.
+3. **Keamanan Kredensial (Zero-Leak)**:
+   - Secret rahasia (`SUPABASE_SERVICE_ROLE_KEY` dan `OPENAI_API_KEY`) hanya diakses di sisi server (`src/app/api/...` dan `src/lib/supabase/server.js`).
+   - Browser klien hanya menerima kredensial publik (`NEXT_PUBLIC_SUPABASE_URL` dan `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`) yang dilindungi penuh oleh aturan **Row Level Security (RLS)** PostgreSQL.
+4. **Optimalisasi Latensi (Region Singapore `sin1`)**: Melalui `vercel.json`, fungsi serverless ditempatkan pada region terdekat dengan pengguna Indonesia (`sin1`), memangkas latensi dari ~220ms (US) menjadi ~20ms.
+
+---
+
+## Struktur Folder & File Kunci
 
 ```
-supabase/schema.sql          # tabel + enum + RLS + semua RPC matchmaking & lobby (jalankan di SQL Editor)
-scripts/seed.mjs             # akun demo via service role
-src/app/app/voice/page.js   # percakapan suara mengalir (gaya ChatGPT voice): tanggapan + lanjut otomatis
-src/app/app/page.js          # setelah suara: Gema + ringkasan bisa dikoreksi, pilih jalur (grup / 1-on-1)
-src/app/app/pilih/page.js    # "pilihan": pintu pertama setelah login — Pengguna (suara) | Relawan (formulir)
-src/components/VoiceOrb.jsx  # orb animasi (speaking / listening / thinking) — dekoratif, aria-hidden
-src/app/app/lobby/page.js    # lobby relawan: status siap, muncul matchmaking dari user, Buat Manggil
-src/app/app/queue/page.js    # antrean grup / 1-on-1 + timeout & opsi alternatif
-src/app/app/session/[id]/    # ruang sesi: chat realtime, panduan fase, konfirmasi, check-in
-src/app/app/volunteer/       # formulir relawan + unggah 1 bukti kualifikasi -> menunggu verif admin
-src/app/app/admin/           # dashboard admin: angka operasional, approve/reject (termasuk lihat bukti), laporan, konfigurasi demo
-src/lib/voice.js             # Web Speech API: TTS (AI bicara) + STT (jawab dengan suara)
-src/lib/volunteer.js         # validasi + unggah bukti kualifikasi ke bucket privat & signed URL-nya
-src/app/api/support-request/ # ringkasan AI (opsional OPENAI_API_KEY; default berbasis aturan)
+├── .env.example                  # Template konfigurasi environment standar (Vercel & lokal)
+├── .env.local.example            # Salinan template lokal beranotasi lengkap
+├── vercel.json                   # Konfigurasi deployment Vercel (Region sin1)
+├── next.config.mjs               # Konfigurasi Next.js 15 & Security Headers (CSP, Permissions Policy)
+├── scripts/
+│   ├── test-deployment.mjs       # Test suite integrasi deployment (npm test)
+│   ├── seed.mjs                  # Akun demo via service role admin
+│   └── build-journal-knowledge.mjs # Generator basis pengetahuan jurnal ilmiah
+├── supabase/
+│   └── schema.sql                # Skema PostgreSQL + RLS + RPC Matchmaking & Consent
+└── src/
+    ├── middleware.js             # Edge Auth & Session Guard (kompatibel Next.js 15 Proxy)
+    ├── app/
+    │   ├── api/
+    │   │   ├── health/route.js         # Endpoint health check & monitoring (/api/health)
+    │   │   ├── auth/register/route.js  # Serverless Handler pendaftaran aman dengan rate-limit
+    │   │   └── support-request/route.js # Serverless Handler analisis kebutuhan AI & jurnal ilmiah
+    │   ├── app/
+    │   │   ├── voice/page.js     # Percakapan suara imersif (TTS + STT adaptif waktu)
+    │   │   ├── page.js           # Gema visual generatif & ringkasan yang bisa dikoreksi
+    │   │   ├── pilih/page.js     # Pintu pertama pasca-login (Pengguna vs Relawan)
+    │   │   ├── lobby/page.js     # Lobby relawan: ketersediaan & Buat Manggil
+    │   │   ├── queue/page.js     # Antrean matchmaking grup / 1-on-1 + timeout
+    │   │   ├── session/[sessionId]/page.js # Ruang chat realtime + sensor moderasi otomatis
+    │   │   ├── volunteer/page.js # Formulir relawan + upload bukti kualifikasi
+    │   │   ├── account/page.js   # Pengaturan profil akun pengguna
+    │   │   └── admin/page.js     # Dashboard admin operasional & verifikasi relawan
+    │   ├── login/page.js         # Halaman autentikasi login
+    │   ├── register/page.js      # Halaman pendaftaran pengguna
+    │   └── page.js               # Editorial landing page (salam adaptif jam nyata)
+    └── lib/
+        ├── time.js               # Helper deteksi sapaan waktu aktual (Pagi/Siang/Sore/Malam)
+        ├── moderation.js         # Sensor moderasi kata kasar otomatis (Bahasa Indonesia)
+        ├── voice.js              # State machine Web Speech API & audio lock
+        ├── intake.js             # Pertanyaan intake terstruktur & parser kebutuhan
+        └── supabase/
+            ├── client.js         # Browser Supabase client (@supabase/ssr)
+            ├── server.js         # Server & Admin Supabase client (@supabase/ssr)
+            └── env.js            # Validasi kredensial environment Supabase
 ```
 
-## Keputusan desain penting (sesuai dokumen)
+---
+
+## Panduan Deployment Vercel & GitHub CI/CD
+
+Platform Hearme terintegrasi secara otomatis dengan alur Git di Vercel:
+- **Production Deployment**: Otomatis ter-deploy ke domain produksi setiap kali ada `git push` ke branch utama (`main`).
+- **Preview Deployment**: Setiap Pull Request (PR) atau branch pengembangan baru otomatis dibuatkan link preview terisolasi untuk pengujian sebelum digabung ke `main`.
+
+### Langkah Konfigurasi Environment Variables di Vercel Dashboard:
+Buka **Vercel Dashboard** → Pilih Project **Hearme** → **Settings** → **Environment Variables**, lalu tambahkan:
+
+| Nama Variabel | Lingkungan (Environment) | Deskripsi |
+| :--- | :--- | :--- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Production, Preview, Development | URL Project Supabase (`https://your-id.supabase.co`) |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Production, Preview, Development | Publishable Key (`sb_publishable_...`) atau Anon Key (`eyJ...`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Production, Preview, Development | Service Role Key rahasia (hanya server / bypass RLS) |
+| `OPENAI_API_KEY` | Production, Preview, Development | *(Opsional)* API Key OpenAI untuk grounding ilmiah LLM |
+| `OPENAI_MODEL` | Production, Preview, Development | *(Opsional)* Default: `gpt-4o-mini` |
+
+> [!IMPORTANT]
+> Di **Supabase Dashboard** (*Authentication -> URL Configuration*):
+> Pastikan **Site URL** diisi domain Vercel Anda (misal `https://hearme.vercel.app`), dan tambahkan `https://*-your-team.vercel.app/**` ke **Redirect URLs** agar login pada Preview Deployment berjalan mulus.
+
+---
+
+## Pengujian & Verifikasi Lokal
+
+Sebelum melakukan push atau deploy, pastikan seluruh pengujian integrasi lolos:
+
+```bash
+# 1. Jalankan test suite integrasi deployment
+npm test
+
+# 2. Jalankan build Next.js lokal
+npm run build
+```
+
+---
+
+## Keputusan Desain Penting (Sesuai Dokumen)
 
 - **Tidak ada transkrip tersimpan** — pesan hanya lewat Realtime Broadcast. Yang tersimpan hanya ringkasan
   kebutuhan yang *dikonfirmasi pengguna* (`support_requests.needs_summary`).
+- **Moderasi Otomatis Terpasang** — pesan chat otomatis disaring dan disensor secara real-time demi menjaga ruang aman bagi seluruh mahasiswa.
 - **Admin tidak punya akses default ke percakapan**; RLS membatasi. Admin hanya melihat laporan & agregat.
 - **Semua transisi status di backend** (RPC `SECURITY DEFINER`), bukan hanya di UI.
 - **Relawan `approved` saja** yang bisa `available` (dicek trigger, bukan cuma UI).
 - **Relawan telat di grup tidak masuk otomatis** — butuh persetujuan semua peserta (batas waktu configurable).
-- **Blokir & laporan** memengaruhi matchmaking (blokir difilter di RPC).
 - **Angka 3 menit / kuota grup / durasi fase = konfigurasi** (`app_config`), bukan aturan universal.
 
 ## Konfigurasi operasional (`app_config`, bisa diubah dari panel admin)

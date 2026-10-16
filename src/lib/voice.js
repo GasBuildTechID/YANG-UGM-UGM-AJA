@@ -32,6 +32,37 @@ export function stopSpeaking() {
   }
 }
 
+let lockedVoiceURI = null;
+const VOICE_STORAGE_KEY = 'hearme_voice_uri';
+
+export function getSavedVoiceURI() {
+  if (lockedVoiceURI) return lockedVoiceURI;
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    try {
+      const saved = window.sessionStorage.getItem(VOICE_STORAGE_KEY);
+      if (saved) {
+        lockedVoiceURI = saved;
+        return saved;
+      }
+    } catch {
+      // abaikan jika sessionStorage diblokir
+    }
+  }
+  return null;
+}
+
+export function setSelectedVoiceURI(uri) {
+  lockedVoiceURI = uri || null;
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    try {
+      if (uri) window.sessionStorage.setItem(VOICE_STORAGE_KEY, uri);
+      else window.sessionStorage.removeItem(VOICE_STORAGE_KEY);
+    } catch {
+      // abaikan
+    }
+  }
+}
+
 // Daftar voice bisa datang terlambat — panggil sekali saat halaman dibuka.
 export function warmUpVoices() {
   if (!ttsSupported()) return;
@@ -45,17 +76,76 @@ export function warmUpVoices() {
   }
 }
 
+/**
+ * Mengambil daftar voice Bahasa Indonesia yang tersedia di browser
+ */
+export function getAvailableVoices() {
+  if (!ttsSupported()) return [];
+  try {
+    const all = window.speechSynthesis.getVoices() || [];
+    return all.filter((v) => {
+      const l = String(v.lang || '').toLowerCase();
+      return l.startsWith('id') || l.includes('indonesia');
+    });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Pemilihan voice yang konsisten dan deterministik.
+ * Sekali sebuah voice dipilih, voice tersebut disimpan agar TIDAK berubah-ubah antar-respons.
+ */
 function pickVoice(lang) {
   if (!ttsSupported()) return null;
   try {
     const voices = window.speechSynthesis.getVoices() || [];
     if (!voices.length) return null;
+
+    // 1. Jika sudah ada voice yang terkunci di sesi ini, selalu pakai voice tersebut
+    const savedUri = getSavedVoiceURI();
+    if (savedUri) {
+      const exact = voices.find((v) => v.voiceURI === savedUri);
+      if (exact) return exact;
+    }
+
     const base = String(lang || 'id').slice(0, 2).toLowerCase();
-    return (
-      voices.find((v) => String(v.lang || '').toLowerCase() === base) ||
-      voices.find((v) => String(v.lang || '').toLowerCase().startsWith(base)) ||
-      null
-    );
+
+    // 2. Filter voice bahasa target (Indonesia)
+    const matching = voices.filter((v) => {
+      const l = String(v.lang || '').toLowerCase();
+      return l === base || l.startsWith(`${base}-`) || l.startsWith(base);
+    });
+
+    if (matching.length > 0) {
+      // Urutkan secara deterministik berdasarkan kualitas suara
+      const ranked = matching.sort((a, b) => {
+        const score = (v) => {
+          const name = String(v.name || '').toLowerCase();
+          let s = 0;
+          if (name.includes('google')) s += 10;
+          if (name.includes('natural')) s += 8;
+          if (name.includes('indonesia')) s += 5;
+          if (name.includes('gadis') || name.includes('ardi')) s += 6;
+          if (v.localService) s += 2;
+          return s;
+        };
+        return score(b) - score(a);
+      });
+
+      const chosen = ranked[0];
+      if (chosen?.voiceURI) {
+        setSelectedVoiceURI(chosen.voiceURI);
+      }
+      return chosen;
+    }
+
+    // Fallback pertama jika tidak ada id-ID
+    const defaultVoice = voices.find((v) => v.default) || voices[0] || null;
+    if (defaultVoice?.voiceURI) {
+      setSelectedVoiceURI(defaultVoice.voiceURI);
+    }
+    return defaultVoice;
   } catch {
     return null;
   }
@@ -65,7 +155,7 @@ function pickVoice(lang) {
 // Ini yang membuat mikrofon tetap terbuka walau browser "lupa" memanggil onend.
 // Jaring pengaman: (1) pantau speechSynthesis.speaking, (2) batas waktu mutlak.
 // Mengembalikan fungsi pembatalan yang TIDAK memicu onEnd.
-export function speak(text, { lang = 'id-ID', rate = 1, pitch = 1, onEnd, minMs = 900 } = {}) {
+export function speak(text, { lang = 'id-ID', rate = 1.0, pitch = 1.0, onEnd, minMs = 900 } = {}) {
   if (!ttsSupported() || !text) {
     onEnd?.();
     return () => {};
@@ -90,7 +180,7 @@ export function speak(text, { lang = 'id-ID', rate = 1, pitch = 1, onEnd, minMs 
   };
 
   // perkiraan durasi bicara + batas waktu mutlak
-  const estimate = Math.min(20000, Math.max(minMs, String(text).length * 95));
+  const estimate = Math.min(22000, Math.max(minMs, String(text).length * 95));
   timer = setTimeout(finish, estimate + 4000);
 
   // Chrome kadang tidak memanggil onend. Pantau status bicara sebagai gantinya:
@@ -111,15 +201,14 @@ export function speak(text, { lang = 'id-ID', rate = 1, pitch = 1, onEnd, minMs 
     utterance.lang = lang;
     utterance.rate = rate;
     utterance.pitch = pitch;
-    // Penetapan voice punya try sendiri: kalau gagal (objek voice tidak dikenali
-    // browser), bicara tetap jalan dengan voice bawaan. Kalau digabung dengan
-    // try utama, satu kegagalan di sini membatalkan seluruh ucapan dalam diam.
+
     try {
       const voice = pickVoice(lang);
       if (voice) utterance.voice = voice;
     } catch {
-      // lanjut dengan voice bawaan
+      // lanjut dengan voice bawaan jika gagal menetapkan
     }
+
     utterance.onend = finish;
     utterance.onerror = finish;
     window.speechSynthesis.speak(utterance);
@@ -134,17 +223,31 @@ export function speak(text, { lang = 'id-ID', rate = 1, pitch = 1, onEnd, minMs 
   };
 }
 
+let micPermissionGranted = false;
+
 // Minta izin mikrofon lebih dulu (getUserMedia) supaya kegagalan punya sebab yang jelas.
 // Bukan hanya soal izin: ini juga menyalakan indikator mikrofon di browser.
 export async function ensureMicPermission() {
   if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
     return { ok: true, reason: 'unsupported' };
   }
+  // Jika sudah pernah berhasil di sesi ini, tidak perlu mengunci hardware lagi
+  if (micPermissionGranted) {
+    return { ok: true };
+  }
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    stream.getTracks().forEach((track) => track.stop());
+    stream.getTracks().forEach((track) => {
+      try {
+        track.stop();
+      } catch {
+        // abaikan
+      }
+    });
+    micPermissionGranted = true;
     return { ok: true };
   } catch (err) {
+    micPermissionGranted = false;
     return { ok: false, reason: err?.name || 'Error' };
   }
 }
@@ -185,10 +288,7 @@ export function describeMicPermission(reason) {
   }
 }
 
-// Pengenal suara. continuous=true supaya kalimat panjang tidak terpotong di tengah;
-// transkrip terakhir (final maupun interim) selalu dikirim saat pengenalan berakhir,
-// jadi ucapan yang sudah terdengar tidak hilang begitu saja.
-// Pemanggil yang menentukan kapan giliran bicara selesai (mis. lewat deteksi hening).
+// Pengenal suara dengan state-machine yang aman dari race condition
 export function createRecognizer({ lang = 'id-ID', continuous = true, onResult, onEnd, onError } = {}) {
   if (!sttSupported()) return null;
   const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -201,6 +301,13 @@ export function createRecognizer({ lang = 'id-ID', continuous = true, onResult, 
   let finalText = '';
   let lastInterim = '';
   let cancelled = false;
+  let isRunning = false;
+  let isStopping = false;
+
+  recognition.onstart = () => {
+    isRunning = true;
+    isStopping = false;
+  };
 
   recognition.onresult = (event) => {
     let finalStr = '';
@@ -224,19 +331,36 @@ export function createRecognizer({ lang = 'id-ID', continuous = true, onResult, 
     });
   };
 
-  recognition.onerror = (event) => onError?.(event);
+  recognition.onerror = (event) => {
+    isRunning = false;
+    isStopping = false;
+    onError?.(event);
+  };
 
   recognition.onend = () => {
+    isRunning = false;
+    isStopping = false;
     if (cancelled) return;
     onEnd?.({ transcript: `${finalText} ${lastInterim}`.trim() });
   };
 
   return {
     start() {
-      recognition.start();
+      if (isRunning || isStopping) return;
+      cancelled = false;
+      try {
+        recognition.start();
+      } catch (err) {
+        // Tangani jika browser melempar exception karena state internal
+        if (err?.name !== 'InvalidStateError') {
+          throw err;
+        }
+      }
     },
     // stop(): pengenalan ditutup wajar, transkrip tetap dikirim lewat onEnd.
     stop() {
+      if (!isRunning || isStopping) return;
+      isStopping = true;
       try {
         recognition.stop();
       } catch {
@@ -246,11 +370,16 @@ export function createRecognizer({ lang = 'id-ID', continuous = true, onResult, 
     // abort(): dibatalkan sengaja, onEnd tidak dipanggil.
     abort() {
       cancelled = true;
+      isRunning = false;
+      isStopping = false;
       try {
         recognition.abort();
       } catch {
         // abaikan
       }
+    },
+    get isRunning() {
+      return isRunning;
     },
   };
 }

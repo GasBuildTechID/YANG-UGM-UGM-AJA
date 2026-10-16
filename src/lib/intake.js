@@ -1,5 +1,8 @@
 // Ringkasan kebutuhan berbasis aturan (fallback tanpa API) + parser ringkasan LLM.
-// Nada bahasa: malam yang hangat — singkat dan puitis, bukan kuesioner klinis.
+// Nada bahasa: hangat dan adaptif sesuai waktu — singkat dan puitis, bukan kuesioner klinis.
+import { getTimeGreeting, getVoiceGreeting } from './time.js';
+
+export { getTimeGreeting, getVoiceGreeting };
 
 export const BREATHING_STEPS = ['Tarik napas…', 'Tahan sebentar…', 'Buang pelan-pelan…'];
 
@@ -46,7 +49,7 @@ export const INTAKE_QUESTIONS = [
   },
 ];
 
-import { findRelevantJournals } from '@/lib/journalKnowledge';
+import { findRelevantJournals } from './journalKnowledge.js';
 
 export function buildSummaryFromAnswers(answers) {
   const needMap = {
@@ -142,6 +145,49 @@ export const FREE_TEXT_HINT = 'Tidak harus rapi. Tulis apa adanya.';
 export const VOICE_QUESTION_KEYS = ['mood', 'need', 'format'];
 
 export const VOICE_QUESTIONS = INTAKE_QUESTIONS.filter((q) => VOICE_QUESTION_KEYS.includes(q.key));
+
+/**
+ * Menghasilkan pertanyaan Voice AI yang dinamis dan menyesuaikan waktu riil (pagi, siang, sore, malam)
+ */
+export function getAdaptiveVoiceQuestions(date = new Date()) {
+  const time = getTimeGreeting(date).toLowerCase();
+  const timeCap = getTimeGreeting(date);
+
+  return [
+    {
+      key: 'mood',
+      question: `${timeCap} ini, apa yang paling berat?`,
+      helper: 'Tidak ada jawaban yang salah.',
+      options: [
+        { value: 'stres', label: 'Pikiran penuh — tugas menumpuk' },
+        { value: 'sedih', label: 'Sedih yang belum selesai' },
+        { value: 'lelah', label: 'Lelah — ingin berhenti sebentar' },
+        { value: 'lainnya', label: 'Sulit dijelaskan' },
+      ],
+    },
+    {
+      key: 'need',
+      question: 'Kalau ada yang bisa menemanimu, kamu ingin…',
+      helper: 'Bukan tes — hanya apa yang kamu butuhkan.',
+      options: [
+        { value: 'didengarkan', label: 'Didengarkan — tanpa dinilai' },
+        { value: 'berbagi_pengalaman', label: 'Bertemu yang senasib' },
+        { value: 'strategi_praktis', label: 'Bantuan langkah praktis' },
+        { value: 'bantuan_profesional', label: 'Bantuan profesional' },
+      ],
+    },
+    {
+      key: 'format',
+      question: `Melewati ${time} ini dengan cara apa?`,
+      helper: 'Bisa berubah pikiran kapan saja.',
+      options: [
+        { value: 'group', label: 'Lingkaran kecil — 3–4 orang' },
+        { value: 'one_to_one', label: 'Berdua dengan relawan' },
+        { value: 'unsure', label: 'Belum tahu' },
+      ],
+    },
+  ];
+}
 
 // Kunci penyimpanan sementara antar layar (voice AI -> ringkasan). Bukan data permanen.
 export const INTAKE_STORAGE_KEY = 'hearme:intake';

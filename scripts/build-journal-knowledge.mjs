@@ -272,11 +272,13 @@ export async function buildKnowledge() {
 
   const result = Array.from(uniqueArticles.values());
   const outputPath = path.resolve('src', 'data', 'journalKnowledge.json');
+  const jsOutputPath = path.resolve('src', 'data', 'journalKnowledge.js');
   fs.writeFileSync(outputPath, JSON.stringify(result, null, 2), 'utf-8');
+  fs.writeFileSync(jsOutputPath, 'const journalKnowledge = ' + JSON.stringify(result, null, 2) + ';\nexport default journalKnowledge;\n', 'utf-8');
 
   console.log(`\nBerhasil membuat basis pengetahuan jurnal:`);
   console.log(`- Total jurnal ilmiah terdaftar: ${result.length}`);
-  console.log(`- Disimpan di: ${outputPath}`);
+  console.log(`- Disimpan di: ${outputPath} & ${jsOutputPath}`);
   return result;
 }
 

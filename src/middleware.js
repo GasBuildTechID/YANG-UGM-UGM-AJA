@@ -17,18 +17,30 @@ export async function middleware(request) {
         return request.cookies.getAll();
       },
       setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        try {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        } catch {
+          // Request cookies may be immutable in edge runtime
+        }
         response = NextResponse.next({ request });
-        cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options)
-        );
+        cookiesToSet.forEach(({ name, value, options }) => {
+          try {
+            response.cookies.set(name, value, options);
+          } catch {
+            // Prevent uncaught proxy TypeError in edge runtime
+          }
+        });
       },
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data?.user || null;
+  } catch {
+    user = null;
+  }
 
   const { pathname } = request.nextUrl;
   const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/register');
@@ -37,13 +49,25 @@ export async function middleware(request) {
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = '/';
-    return NextResponse.redirect(url);
+    const redirectResponse = NextResponse.redirect(url);
+    try {
+      response.cookies.getAll().forEach((c) => redirectResponse.cookies.set(c.name, c.value, c));
+    } catch {
+      // Abaikan jika penyalinan cookie gagal
+    }
+    return redirectResponse;
   }
 
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/app/voice';
-    return NextResponse.redirect(url);
+    const redirectResponse = NextResponse.redirect(url);
+    try {
+      response.cookies.getAll().forEach((c) => redirectResponse.cookies.set(c.name, c.value, c));
+    } catch {
+      // Abaikan jika penyalinan cookie gagal
+    }
+    return redirectResponse;
   }
 
   return response;

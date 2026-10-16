@@ -7,7 +7,7 @@ import { ArrowLeft, BookHeart, LifeBuoy, ScrollText, ShieldAlert } from 'lucide-
 import WaveDots from '@/components/WaveDots';
 import { createClient } from '@/lib/supabase/client';
 import { useSession } from '@/components/SessionProvider';
-import { CRISIS_RESOURCES, REPORT_REASON_LABELS, SESSION_STATUS_LABELS, formatDateTime } from '@/lib/labels';
+import { CRISIS_RESOURCES, SESSION_STATUS_LABELS, formatDateTime } from '@/lib/labels';
 
 export default function AccountPage() {
   const supabase = createClient();
@@ -19,7 +19,6 @@ export default function AccountPage() {
   const [saved, setSaved] = useState(false);
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
-  const [reports, setReports] = useState([]);
 
   const isAdmin = profile?.role === 'admin';
   const backHref = isAdmin ? '/app/admin' : '/app';
@@ -38,14 +37,6 @@ export default function AccountPage() {
         .order('joined_at', { ascending: false })
         .limit(10);
       setHistory(data || []);
-
-      const { data: myReports } = await supabase
-        .from('reports')
-        .select('id, reason_category, status, created_at')
-        .eq('reporter_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      setReports(myReports || []);
       setLoadingHistory(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -143,35 +134,12 @@ export default function AccountPage() {
 
       <div className="card">
         <h2 className="flex items-center gap-2 font-bold text-frost">
-          <BookHeart className="size-5" /> Laporan yang kamu buat
-        </h2>
-        {reports.length === 0 ? (
-          <p className="mt-2 text-sm text-mist">Kamu belum pernah melaporkan apa pun.</p>
-        ) : (
-          <ul className="mt-3 space-y-2">
-            {reports.map((r) => (
-              <li key={r.id} className="flex items-center justify-between rounded-xl border border-white/10 p-3">
-                <div>
-                  <p className="text-sm font-semibold text-frost">{REPORT_REASON_LABELS[r.reason_category]}</p>
-                  <p className="text-xs text-fog">{formatDateTime(r.created_at)}</p>
-                </div>
-                <span className={r.status === 'open' ? 'chip-amber' : 'chip-teal'}>
-                  {r.status === 'open' ? 'Sedang ditinjau' : 'Sudah ditinjau'}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <div className="card">
-        <h2 className="flex items-center gap-2 font-bold text-frost">
           <ShieldAlert className="size-5" /> Batas layanan & privasi
         </h2>
         <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-fog">
-          <li>Tanpa transkrip. Yang tersimpan: ringkasan yang kamu setujui.</li>
-          <li>Kerahasiaan tidak bisa dijamin sepenuhnya. Laporan ditangani tim.</li>
-          <li>Kamu bisa diam, keluar, lapor, dan blokir kapan saja.</li>
+          <li>Tanpa transkrip rekaman suara. Yang tersimpan hanyalah ringkasan yang kamu setujui.</li>
+          <li>Kenyamanan dan ruang aman dijaga bersama dengan sistem moderasi otomatis.</li>
+          <li>Kamu bebas diam atau keluar dari sesi kapan saja dengan aman.</li>
         </ul>
       </div>
 

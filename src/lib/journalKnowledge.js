@@ -1,4 +1,4 @@
-import journalKnowledge from '@/data/journalKnowledge.json';
+import journalKnowledge from '../data/journalKnowledge.js';
 
 /**
  * Mencari jurnal yang relevan berdasarkan teks input atau kategori kebutuhan pengguna.

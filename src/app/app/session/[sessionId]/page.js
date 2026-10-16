@@ -20,6 +20,7 @@ import { PHASE_LABELS, SESSION_GUIDE, formatClock, MOOD_LABELS } from '@/lib/lab
 import SafetyActions from '@/components/SafetyActions';
 import GenerativeArt from '@/components/GenerativeArt';
 import WaveDots from '@/components/WaveDots';
+import { checkModeration, censorProfanity } from '@/lib/moderation';
 
 const PHASE_ORDER = ['opening', 'sharing', 'closing'];
 
@@ -40,6 +41,7 @@ export default function SessionRoomPage() {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [typingNames, setTypingNames] = useState([]);
+  const [modNotice, setModNotice] = useState('');
   const scrollRef = useRef(null);
 
   const [checkinDone, setCheckinDone] = useState(false);
@@ -47,8 +49,10 @@ export default function SessionRoomPage() {
   const [moodNote, setMoodNote] = useState('');
 
   const myRole = useMemo(
-    () => participants.find((p) => p.user_id === user?.id)?.participant_role || null,
-    [participants, user]
+    () =>
+      participants.find((p) => p.user_id === user?.id)?.participant_role ||
+      (session?.facilitator_id === user?.id ? 'facilitator' : null),
+    [participants, user, session]
   );
   const myConsent = useMemo(
     () => participants.find((p) => p.user_id === user?.id)?.consent_to_joined_volunteer_at || null,
@@ -56,9 +60,12 @@ export default function SessionRoomPage() {
   );
   const volunteerConsent = useMemo(
     () =>
-      participants.find((p) => p.participant_role === 'volunteer' || p.participant_role === 'facilitator')
-        ?.consent_to_joined_volunteer_at || null,
-    [participants]
+      session?.volunteer_consent_approved ||
+      Boolean(
+        participants.find((p) => p.participant_role === 'volunteer' || p.participant_role === 'facilitator')
+          ?.consent_to_joined_volunteer_at
+      ),
+    [participants, session]
   );
   const memberConsent = useMemo(
     () => participants.find((p) => p.participant_role === 'member')?.consent_to_joined_volunteer_at || null,
@@ -66,7 +73,8 @@ export default function SessionRoomPage() {
   );
   const bothConsent = Boolean(memberConsent && volunteerConsent);
   const isMember = myRole === 'member';
-  const isVolunteerSide = myRole === 'volunteer' || myRole === 'facilitator';
+  const isVolunteerSide =
+    myRole === 'volunteer' || myRole === 'facilitator' || session?.facilitator_id === user?.id;
   const isGroup = session?.mode === 'group';
   const isOneToOne = session?.mode === 'one_to_one';
 
@@ -77,10 +85,30 @@ export default function SessionRoomPage() {
     ]);
     setSession(s || null);
     if (s && p) {
+      let participantList = [...p];
+      // Jika relawan sudah disetujui (volunteer_consent_approved) atau memiliki facilitator_id
+      // namun belum terdaftar di session_participants, sertakan relawan ke dalam daftar peserta
+      if (
+        s.facilitator_id &&
+        s.volunteer_consent_approved &&
+        !participantList.some((row) => row.user_id === s.facilitator_id)
+      ) {
+        participantList.push({
+          session_id: sessionId,
+          user_id: s.facilitator_id,
+          participant_role: 'facilitator',
+          consent_to_joined_volunteer_at: s.phase_started_at || new Date().toISOString(),
+          joined_at: s.phase_started_at || new Date().toISOString(),
+          left_at: null,
+        });
+      }
       const withNames = await Promise.all(
-        p.map(async (row) => {
+        participantList.map(async (row) => {
           const { data: u } = await supabase.from('users').select('display_name').eq('id', row.user_id).maybeSingle();
-          return { ...row, display_name: u?.display_name || 'Peserta' };
+          return {
+            ...row,
+            display_name: u?.display_name || (row.user_id === s.facilitator_id ? 'Relawan' : 'Peserta'),
+          };
         })
       );
       setParticipants(withNames);
@@ -97,7 +125,7 @@ export default function SessionRoomPage() {
   // Polling ringan untuk status sesi/peserta (tanpa websocket DB)
   useEffect(() => {
     if (loading || !user) return undefined;
-    const id = setInterval(load, 5000);
+    const id = setInterval(load, 4000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, user, sessionId, load]);
@@ -116,7 +144,12 @@ export default function SessionRoomPage() {
 
   const broadcast = useRealtimeBroadcast(`session:${sessionId}`, 'msg', (payload) => {
     if (!payload) return;
-    setMessages((prev) => [...prev.slice(-199), payload]);
+    // Sensor otomatis pada pesan masuk agar ruang obrolan terlindungi
+    const sanitizedMsg = {
+      ...payload,
+      text: censorProfanity(payload.text || ''),
+    };
+    setMessages((prev) => [...prev.slice(-199), sanitizedMsg]);
   });
 
   useRealtimeBroadcast(`session:${sessionId}`, 'typing', (payload) => {
@@ -131,14 +164,25 @@ export default function SessionRoomPage() {
 
   async function sendMessage(e) {
     e?.preventDefault();
-    const text = draft.trim();
-    if (!text) return;
+    const rawText = draft.trim();
+    if (!rawText) return;
+
+    // Filter moderasi kata tidak pantas secara otomatis
+    const mod = checkModeration(rawText);
+    if (!mod.isClean) {
+      setModNotice('Pesanmu disensor otomatis agar ruang obrolan tetap aman dan nyaman bagi semua teman.');
+      setTimeout(() => setModNotice(''), 5000);
+    }
+
+    const cleanText = mod.cleanText;
+
     const msg = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       user_id: user.id,
       name: profile?.display_name || 'Aku',
-      text: text.slice(0, 1000),
+      text: cleanText.slice(0, 1000),
       ts: Date.now(),
+      censored: !mod.isClean,
     };
     setMessages((prev) => [...prev.slice(-199), msg]);
     setDraft('');
@@ -180,9 +224,14 @@ export default function SessionRoomPage() {
   // ---- aksi peserta pada relawan yang mau gabung grup ----
   async function approveVolunteer() {
     setBusy(true);
-    const { error: err } = await supabase.rpc('approve_volunteer_join', { p_session_id: sessionId });
+    setError('');
+    const { data, error: err } = await supabase.rpc('approve_volunteer_join', { p_session_id: sessionId });
     setBusy(false);
-    if (err) setError(err.message);
+    if (err) {
+      setError(err.message);
+    } else if (data?.approved) {
+      setSession((prev) => (prev ? { ...prev, volunteer_consent_approved: true } : prev));
+    }
     load();
   }
 
@@ -227,7 +276,13 @@ export default function SessionRoomPage() {
   }
 
   // Timer consent untuk relawan gabung grup (dokumen §4)
-  const consentDeadline = session?.volunteer_joined && !session?.volunteer_consent_approved ? session.phase_started_at : null;
+  const consentDeadline = useMemo(() => {
+    if (session?.volunteer_joined && !session?.volunteer_consent_approved && session?.phase_started_at) {
+      return new Date(new Date(session.phase_started_at).getTime() + 60 * 1000).toISOString();
+    }
+    return null;
+  }, [session?.volunteer_joined, session?.volunteer_consent_approved, session?.phase_started_at]);
+
   const consentRemaining = useCountdown(consentDeadline, {
     onExpire: () => {
       if (session?.volunteer_joined && !session?.volunteer_consent_approved) load();
@@ -411,33 +466,46 @@ export default function SessionRoomPage() {
       {isGroup && session.volunteer_joined && !session.volunteer_consent_approved && !isEnded && (
         <div className="card border-amber-300/40 bg-amber-400/10">
           {isMember ? (
-            <>
-              <h2 className="flex items-center gap-2 font-bold text-amber-100">
-                <UserPlus className="size-5" /> Seorang relawan ingin bergabung
-              </h2>
-              <p className="mt-1 text-sm text-amber-200">
-                Kalau semua peserta setuju, seorang relawan akan mendampingi sesi ini. Kalau salah satu
-                menolak, sesi tetap berjalan seperti sekarang.
-              </p>
-              <p className="mt-1 text-sm text-amber-200">
-                Waktu memilih: <strong>{formatClock(consentRemaining)}</strong>
-              </p>
-              <div className="mt-3 flex gap-2">
-                <button type="button" className="btn-primary" onClick={approveVolunteer} disabled={busy}>
-                  <Check className="size-4" /> Aku setuju
-                </button>
-                <button type="button" className="btn-secondary" onClick={declineVolunteer} disabled={busy}>
-                  <X className="size-4" /> Tidak, lanjut tanpa relawan
-                </button>
+            myConsent ? (
+              <div className="py-2 text-center">
+                <Check className="mx-auto size-6 text-aurora-teal" />
+                <h2 className="mt-2 font-bold text-amber-100">Persetujuanmu sudah tersimpan</h2>
+                <p className="mt-1 text-sm text-amber-200">
+                  Menunggu konfirmasi anggota lain atau relawan memasuki ruangan…
+                </p>
               </div>
-            </>
+            ) : (
+              <>
+                <h2 className="flex items-center gap-2 font-bold text-amber-100">
+                  <UserPlus className="size-5" /> Seorang relawan ingin bergabung
+                </h2>
+                <p className="mt-1 text-sm text-amber-200">
+                  Kalau semua peserta setuju, seorang relawan akan mendampingi sesi ini. Kalau salah satu
+                  menolak, sesi tetap berjalan seperti sekarang.
+                </p>
+                {consentRemaining > 0 && (
+                  <p className="mt-1 text-sm text-amber-200">
+                    Waktu memilih: <strong>{formatClock(consentRemaining)}</strong>
+                  </p>
+                )}
+                <div className="mt-3 flex gap-2">
+                  <button type="button" className="btn-primary" onClick={approveVolunteer} disabled={busy}>
+                    <Check className="size-4" /> Aku setuju
+                  </button>
+                  <button type="button" className="btn-secondary" onClick={declineVolunteer} disabled={busy}>
+                    <X className="size-4" /> Tidak, lanjut tanpa relawan
+                  </button>
+                </div>
+              </>
+            )
           ) : (
-            <>
-              <h2 className="font-bold text-amber-100">Menunggu persetujuan peserta…</h2>
+            <div className="py-2 text-center">
+              <WaveDots size="sm" className="mx-auto text-amber-200" />
+              <h2 className="mt-2 font-bold text-amber-100">Menunggu persetujuan peserta…</h2>
               <p className="mt-1 text-sm text-amber-200">
-                Kamu tidak akan dimasukkan otomatis. Peserta diberi waktu untuk memilih.
+                Permintaan bergabungmu sedang ditinjau peserta lingkaran. Kamu akan otomatis masuk begitu disetujui.
               </p>
-            </>
+            </div>
           )}
         </div>
       )}
@@ -457,9 +525,11 @@ export default function SessionRoomPage() {
                 Lanjut ke bagian berikutnya →
               </button>
             )}
-            <button type="button" className="btn-danger" onClick={endSession} disabled={busy}>
-              Akhiri sesi
-            </button>
+            {isVolunteerSide && (
+              <button type="button" className="btn-danger" onClick={endSession} disabled={busy}>
+                Akhiri sesi
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -504,6 +574,12 @@ export default function SessionRoomPage() {
               <span>{typingNames.join(', ')} sedang menulis</span>
               <WaveDots size="xs" className="text-mist" />
             </p>
+          )}
+
+          {modNotice && (
+            <div className="border-t border-amber-300/20 bg-amber-400/10 px-4 py-2 text-xs text-amber-200">
+              {modNotice}
+            </div>
           )}
 
           <form onSubmit={sendMessage} className="flex items-center gap-2 border-t border-white/8 p-3">

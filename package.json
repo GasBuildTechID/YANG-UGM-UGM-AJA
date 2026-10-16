@@ -8,6 +8,7 @@
     "start": "next start",
     "seed": "node scripts/seed.mjs",
     "build:journal": "node scripts/build-journal-knowledge.mjs",
+    "test": "node scripts/test-deployment.mjs",
     "lint": "next lint"
   },
   "dependencies": {
