@@ -1,8 +1,8 @@
 # hearme — Platform Peer Support Mahasiswa
 
-**pilihan** → **voice AI interaktif** (cerita dengan suara) → ringkasan kebutuhan yang bisa dikoreksi →
-**grup peer support** (3–4 orang, terstruktur) atau **1-on-1 dengan relawan approved** — dengan aturan
-keselamatan, lapor, blokir, dan jalur bantuan.
+HearMe tidak datang dengan asumsi bahwa semua mahasiswa punya masalah yang sama. Layanan ini dimulai dari pengalaman, perasaan, dan persoalan yang benar-benar sedang dialami oleh masing-masing individu.
+Bukan memaksakan solusi yang sudah disiapkan, melainkan mendengarkan kebutuhan orang yang datang.
+Maknanya: Ceritamu adalah titik awal, bukan sesuatu yang harus disesuaikan dengan sistem.
 
 > **Batas produk:** ini layanan dukungan sebaya, **bukan** diagnosis, terapi, atau pengganti tenaga profesional.
 
