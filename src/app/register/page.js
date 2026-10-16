@@ -127,7 +127,7 @@ export default function RegisterPage() {
             </div>
             <div>
               <label className="label" htmlFor="email">
-                Email kampus
+                Email
               </label>
               <input
                 id="email"
@@ -137,7 +137,7 @@ export default function RegisterPage() {
                 className="input"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="nama@kampus.ac.id"
+                placeholder="nama@email.com"
               />
             </div>
             <div>

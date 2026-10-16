@@ -232,7 +232,7 @@ export default function LandingPage() {
               className="font-display text-[clamp(1.7rem,3.6vw,2.6rem)] leading-tight text-balance"
               {...reveal(0)}
             >
-              Malam ini, mulailah dari satu cerita.
+              {greeting}, mulailah dari satu cerita.
             </motion.h2>
             <motion.p className="mx-auto mt-4 max-w-md text-on-dark-body" {...reveal(0.08)}>
               Tanpa nama asli. Kamu bisa berhenti kapan saja.

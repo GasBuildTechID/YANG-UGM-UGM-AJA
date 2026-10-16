@@ -7,6 +7,32 @@ keselamatan, lapor, blokir, dan jalur bantuan.
 
 > **Batas produk:** ini layanan dukungan sebaya, **bukan** diagnosis, terapi, atau pengganti tenaga profesional.
 
+## ✨ Fitur Unggulan & Inovasi Utama
+
+1. **🎙️ Percakapan Suara AI Alami (ChatGPT Voice-like Experience)**  
+   Percakapan mengalir dua arah tanpa perlu menekan tombol opsi berulang kali: AI membacakan pertanyaan (TTS), pengguna menjawab dengan suara (STT), dan perpindahan pertanyaan dideteksi secara otomatis lewat jeda hening (*silence detection* ~1,4 detik). Dilengkapi *anti-echo* (mikrofon tertutup otomatis saat AI bersuara), visualisasi orb beranimasi, dan kemampuan menyela pembicaraan (*interruptible speech*).
+
+2. **🕒 Konteks Waktu Nyata Adaptif (Time-Aware Greeting & Adaptive Intake)**  
+   Salam di landing page serta pertanyaan pembuka Voice AI beradaptasi secara cerdas dengan jam aktual pengguna (Pagi, Siang, Sore, Malam) untuk menghadirkan atmosfer percakapan yang relevan, empatik, dan personal.
+
+3. **🎨 Katarsis Menjadi Gema (Generative Flow-Field Art)**  
+   Kata-kata curahan pengguna ditransformasikan secara deterministik menjadi karya seni abstrak visual (*Gema*) melalui HTML5 Canvas flow-field. Bersifat murni estetis dan terapeutik tanpa merekam data rahasia.
+
+4. **🛡️ Moderasi Pesan Real-time (Automated Chat Safety Guard)**  
+   Sensor kata kasar otomatis berbahasa Indonesia yang bekerja langsung di dalam ruang chat sesi untuk menyaring ujaran kebencian, pelecehan, atau kata tidak pantas secara real-time demi menjaga ekosistem dukungan sebaya yang aman.
+
+5. **📚 Grounding Riset Jurnal Ilmiah (Evidence-Based Coping Suggestions)**  
+   Analisis kebutuhan pengguna diperkuat oleh basis pengetahuan terstruktur dari jurnal ilmiah kesehatan mental mahasiswa, menghasilkan rekomendasi strategi koping (*coping suggestions*) berbasis bukti ilmiah pada ringkasan intake.
+
+6. **🤝 Fleksibilitas Peer Support: Lingkaran Grup & 1-on-1 (Buat Manggil)**  
+   Pengguna dapat memilih ruang kelompok (3–4 mahasiswa dengan kategori keresahan serupa) atau sesi privat berdua dengan relawan terakreditasi melalui sistem antrean otomatis dan fitur panggilan (*Buat Manggil*) di lobby relawan.
+
+7. **🔒 Privasi Mutlak (Privacy-First & Zero Stored Transcripts)**  
+   Pesan obrolan hanya dialirkan secara *ephemeral* via Supabase Realtime Broadcast tanpa ada transkrip rekaman yang disimpan di database. Satu-satunya data yang tersimpan hanyalah ringkasan kebutuhan yang dikonfirmasi pengguna.
+
+8. **⚡ Smart Role-Based Gateway & Dedicated Admin Dashboard**  
+   Pemisahan alur login otomatis: Akun Admin langsung masuk ke panel dashboard manajemen relawan dan operasional tanpa melewati alur suara AI, Relawan diarahkan ke formulir verifikasi atau lobby, dan Pengguna langsung masuk ke ruang bercerita.
+
 ## Alur baru (sesuai diagram tim)
 
 ```

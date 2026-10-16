@@ -127,6 +127,13 @@ export default function VoiceIntakePage() {
     };
   }, []);
 
+  // Jika admin membuka halaman suara (mis. via URL langsung), alihkan langsung ke dashboard admin
+  useEffect(() => {
+    if (!loading && profile?.role === 'admin') {
+      router.replace('/app/admin');
+    }
+  }, [loading, profile, router]);
+
   function later(fn, ms) {
     const id = window.setTimeout(() => {
       if (aliveRef.current) fn();

@@ -59,8 +59,17 @@ export async function middleware(request) {
   }
 
   if (user && isAuthRoute) {
+    let target = '/app/voice';
+    try {
+      const { data: prof } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
+      if (prof?.role === 'admin' || user.user_metadata?.role === 'admin') {
+        target = '/app/admin';
+      }
+    } catch {
+      // Abaikan jika query profil gagal
+    }
     const url = request.nextUrl.clone();
-    url.pathname = '/app/voice';
+    url.pathname = target;
     const redirectResponse = NextResponse.redirect(url);
     try {
       response.cookies.getAll().forEach((c) => redirectResponse.cookies.set(c.name, c.value, c));

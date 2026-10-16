@@ -55,8 +55,8 @@ export default function AuthModal({ isOpen, initialMode = 'login', onClose }) {
     // Arahkan ke ruang yang tepat
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-      if (prof?.role === 'admin') {
+      const { data: prof } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
+      if (prof?.role === 'admin' || user.user_metadata?.role === 'admin') {
         router.push('/app/admin');
         router.refresh();
         onClose();
