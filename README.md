@@ -260,14 +260,6 @@ npm run build
 | `volunteer_join_consent_seconds` | 30 | waktu peserta menyetujui relawan gabung |
 | `session_durations` | 5/25/10 | menit fase pembukaan/berbagi/penutup |
 
-## Pertanyaan terbuka tim — rekomendasi implementasi saat ini
-
-- Grup tanpa relawan **boleh berjalan** (dianggap layanan tersendiri, bukan ruang tunggu relawan).
-- 3 menit = **batas pencarian relawan** (per request, bukan total).
-- Grup mulai saat **kuota terpenuhi** (jadwal menyusul di P1).
-- Sesi tatap muka **belum** ada — perlu aturan lokasi & keselamatan terpisah.
-- Rujukan profesional masih placeholder di `/app/account#bantuan` — ganti dengan kontak kampus yang terverifikasi.
-
 ## Deploy
 
 Vercel: import repo, set env vars yang sama seperti `.env.local`, deploy.
