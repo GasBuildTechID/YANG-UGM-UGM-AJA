@@ -217,7 +217,7 @@ flowchart TD
 
 ---
 
-## Panduan Deployment Vercel & GitHub 
+## Panduan Deployment Vercel
 
 Platform Hearme terintegrasi secara otomatis dengan alur Git di Vercel:
 - **Production Deployment**: Otomatis ter-deploy ke domain produksi setiap kali ada `git push` ke branch utama (`main`).
