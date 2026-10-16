@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, BellRing, HeartHandshake, Loader2, PhoneCall, UserPlus, Users } from 'lucide-react';
+import WaveDots from '@/components/WaveDots';
 import { createClient } from '@/lib/supabase/client';
 import { useSession } from '@/components/SessionProvider';
 import { APPLICATION_LABELS, CATEGORY_LABELS, PHASE_LABELS, PRESENCE_LABELS } from '@/lib/labels';
@@ -127,7 +128,7 @@ export default function LobbyPage() {
   if (loading || (user && loadingPage)) {
     return (
       <div className="grid place-items-center py-24">
-        <Loader2 className="size-6 animate-spin text-aurora-teal" />
+        <WaveDots size="lg" label="Memuat lobby relawan..." className="text-aurora-teal" />
       </div>
     );
   }
@@ -138,7 +139,7 @@ export default function LobbyPage() {
         <HeartHandshake className="mx-auto size-8 text-aurora-indigo" />
         <h1 className="mt-3 text-lg font-bold text-frost">Masuk dulu ya</h1>
         <p className="mt-1 text-sm text-fog">Lobby relawan terbuka setelah kamu masuk.</p>
-        <Link href="/login" className="btn-primary mt-4 inline-flex">
+        <Link href="/" className="btn-primary mt-4 inline-flex">
           Masuk
         </Link>
       </div>
@@ -168,10 +169,10 @@ export default function LobbyPage() {
     <div className="mx-auto max-w-2xl space-y-4">
       <div>
         <Link
-          href="/app/pilih"
+          href="/app"
           className="mb-2 inline-flex items-center gap-1.5 text-xs font-medium text-fog hover:text-frost"
         >
-          <ArrowLeft className="size-3.5" /> Kembali ke pilihan peran
+          <ArrowLeft className="size-3.5" /> Kembali ke beranda
         </Link>
         <h1 className="text-2xl font-bold text-frost">Lobby relawan</h1>
         <p className="mt-1 text-sm text-fog">

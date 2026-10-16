@@ -5,12 +5,14 @@
 // Kalau belum ada cerita, yang muncul hanya ajakan memulai (bukan formulir penuh).
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Loader2, Mic, RotateCcw, ShieldAlert, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Mic, RotateCcw, ShieldAlert, Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useSession } from '@/components/SessionProvider';
 import CrisisBanner from '@/components/CrisisBanner';
 import GenerativeArt from '@/components/GenerativeArt';
+import WaveDots from '@/components/WaveDots';
 import { INTAKE_STORAGE_KEY } from '@/lib/intake';
 import { CATEGORY_DESCRIPTIONS, CATEGORY_LABELS, LANGUAGE_LABELS } from '@/lib/labels';
 
@@ -26,6 +28,11 @@ export default function IntakeResultPage() {
     suggested_category: 'didengarkan',
     suggested_mode: null,
     language: 'id',
+  });
+  const [evidence, setEvidence] = useState({
+    note: '',
+    coping: '',
+    papers: [],
   });
   const [crisis, setCrisis] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -48,6 +55,11 @@ export default function IntakeResultPage() {
         suggested_category: payload.summary.suggested_category || 'didengarkan',
         suggested_mode: payload.summary.suggested_mode || null,
         language: payload.summary.language || 'id',
+      });
+      setEvidence({
+        note: payload.summary.evidence_note || '',
+        coping: payload.summary.coping_suggestion || '',
+        papers: payload.summary.cited_papers || [],
       });
       setStep('summary');
     } else {
@@ -93,7 +105,11 @@ export default function IntakeResultPage() {
       setError(err.message);
       return;
     }
-    router.push(`/app/queue?request=${data.id}&mode=${mode}`);
+    try {
+      window.sessionStorage.setItem('active_queue_mode', mode);
+      if (data?.id) window.sessionStorage.setItem('active_queue_request', data.id);
+    } catch {}
+    router.push('/app/queue');
   }
 
   function restart() {
@@ -108,7 +124,7 @@ export default function IntakeResultPage() {
   if (loading || step === 'loading') {
     return (
       <div className="grid place-items-center py-24">
-        <Loader2 className="size-6 animate-spin text-aurora-teal" />
+        <WaveDots size="lg" label="Memuat ringkasan ceritamu..." className="text-aurora-teal" />
       </div>
     );
   }
@@ -144,9 +160,6 @@ export default function IntakeResultPage() {
           <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
             <button type="button" className="btn-primary" onClick={() => router.push('/app/voice')}>
               <Mic className="size-4" /> Mulai bercerita
-            </button>
-            <button type="button" className="btn-ghost" onClick={() => router.push('/app/pilih')}>
-              Lihat jalur lain
             </button>
           </div>
           <p className="mt-4 text-xs text-mist">Kamu boleh berhenti kapan saja.</p>
@@ -227,20 +240,57 @@ export default function IntakeResultPage() {
               </div>
             </div>
 
-            <div className="mt-5 flex flex-wrap gap-2">
-              <button type="button" className="btn-primary" onClick={() => setStep('choose')}>
-                Lanjut pilih teman bicara <ArrowRight className="size-4" />
-              </button>
-              <button type="button" className="btn-secondary" onClick={restart}>
-                <RotateCcw className="size-4" /> Cerita ulang
-              </button>
+            {/* Kartu Landasan Ilmiah Berbasis Jurnal */}
+            {(evidence.note || evidence.coping) && (
+              <div className="mt-5 rounded-2xl border border-teal-300/30 bg-teal-300/10 p-4 text-left">
+                <div className="flex items-center gap-2 font-semibold text-frost">
+                  <BookOpen className="size-4 text-aurora-teal" />
+                  <span>Landasan Ilmiah & Saran Praktis</span>
+                </div>
+                {evidence.note && (
+                  <p className="mt-2 text-xs leading-relaxed text-fog">
+                    💡 <strong className="text-frost">Fakta Studi:</strong> {evidence.note}
+                  </p>
+                )}
+                {evidence.coping && (
+                  <p className="mt-1.5 text-xs leading-relaxed text-frost">
+                    🌿 <strong className="text-frost">Langkah Koping:</strong> {evidence.coping}
+                  </p>
+                )}
+                {evidence.papers?.length > 0 && (
+                  <div className="mt-3 border-t border-white/10 pt-2">
+                    <p className="text-[11px] font-medium text-mist">
+                      Berdasarkan telaah literatur ilmiah (English Papers):
+                    </p>
+                    <ul className="mt-1 space-y-1">
+                      {evidence.papers.map((title, i) => (
+                        <li key={i} className="truncate text-[11px] text-fog italic">
+                          • {title}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="mt-6 space-y-3 pt-2">
               <button
                 type="button"
-                className="btn-ghost flex items-center gap-1.5"
-                onClick={() => router.push('/app/pilih')}
+                className="btn-primary w-full justify-center text-sm font-medium"
+                onClick={() => setStep('choose')}
               >
-                <ArrowLeft className="size-4" /> Kembali ke pilihan peran
+                Lanjut pilih teman bicara <ArrowRight className="size-4" />
               </button>
+              <div className="flex items-center justify-between text-xs text-fog">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 transition hover:text-frost"
+                  onClick={restart}
+                >
+                  <RotateCcw className="size-3.5" /> Cerita ulang
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -300,9 +350,9 @@ export default function IntakeResultPage() {
             <button type="button" className="btn-secondary" onClick={() => setStep('summary')}>
               ← Kembali ke ringkasan
             </button>
-            <a className="btn-ghost" href="/app/account#bantuan">
+            <Link className="btn-ghost flex items-center gap-1.5" href="/app/account">
               <ShieldAlert className="size-4" /> Lihat jalur bantuan dulu
-            </a>
+            </Link>
           </div>
         </div>
       )}

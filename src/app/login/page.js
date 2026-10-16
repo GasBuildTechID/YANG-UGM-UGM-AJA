@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowLeft, MoonStar } from 'lucide-react';
+import Logo from '@/components/Logo';
 import { createClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
@@ -14,17 +15,57 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.pathname.includes('/login')) {
+      window.history.replaceState(null, '', '/');
+    }
+  }, []);
+
   async function handleSubmit(e) {
     e.preventDefault();
     setBusy(true);
     setError('');
     const { error: err } = await supabase.auth.signInWithPassword({ email, password });
-    setBusy(false);
     if (err) {
+      setBusy(false);
       setError(err.message === 'Invalid login credentials' ? 'Email atau kata sandi salah.' : err.message);
       return;
     }
-    router.push('/app/pilih');
+
+    // Arahkan langsung ke ruang kerja sesuai peran
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      // 1. Jika Admin -> dashboard admin
+      const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+      if (prof?.role === 'admin') {
+        router.push('/app/admin');
+        router.refresh();
+        return;
+      }
+
+      // 2. Jika Relawan -> lobby atau status verifikasi
+      const { data: vol } = await supabase
+        .from('volunteer_applications')
+        .select('status')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (vol?.status === 'approved') {
+        router.push('/app/lobby');
+        router.refresh();
+        return;
+      }
+      if (vol?.status === 'pending') {
+        router.push('/app/volunteer');
+        router.refresh();
+        return;
+      }
+    }
+
+    // 3. Pengguna biasa -> langsung ke dashboard ruang suara untuk bercerita
+    router.push('/app/voice');
     router.refresh();
   }
 
@@ -37,9 +78,9 @@ export default function LoginPage() {
         >
           <ArrowLeft className="size-3.5" /> Kembali ke beranda
         </Link>
-        <div className="flex items-center gap-2 font-bold text-frost">
-          <span className="logo-mark">🌿</span>
-          hearme
+        <div className="flex items-center gap-2.5 font-bold text-frost">
+          <Logo size={28} />
+          <span>hearme</span>
         </div>
         <h1 className="mt-5 font-display text-2xl font-light">
           Selamat datang kembali <span className="text-gradient italic">di ruangmu.</span>

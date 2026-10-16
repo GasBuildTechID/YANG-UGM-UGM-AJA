@@ -199,20 +199,28 @@ export function createRecognizer({ lang = 'id-ID', continuous = true, onResult, 
   recognition.maxAlternatives = 1;
 
   let finalText = '';
-  let interimText = '';
+  let lastInterim = '';
   let cancelled = false;
 
   recognition.onresult = (event) => {
-    for (let i = event.resultIndex; i < event.results.length; i += 1) {
+    let finalStr = '';
+    let interimStr = '';
+    for (let i = 0; i < event.results.length; i += 1) {
       const result = event.results[i];
       const chunk = result[0]?.transcript || '';
-      if (result.isFinal) finalText = `${finalText} ${chunk}`.trim();
-      else interimText = chunk.trim();
+      if (result.isFinal) {
+        finalStr = `${finalStr} ${chunk}`.trim();
+      } else {
+        interimStr = `${interimStr} ${chunk}`.trim();
+      }
     }
+    finalText = finalStr;
+    lastInterim = interimStr;
+    const combined = `${finalText} ${lastInterim}`.trim();
     onResult?.({
-      finalText: finalText.trim(),
-      interim: interimText,
-      transcript: `${finalText} ${interimText}`.trim(),
+      finalText,
+      interim: lastInterim,
+      transcript: combined,
     });
   };
 
@@ -220,7 +228,7 @@ export function createRecognizer({ lang = 'id-ID', continuous = true, onResult, 
 
   recognition.onend = () => {
     if (cancelled) return;
-    onEnd?.({ transcript: `${finalText} ${interimText}`.trim() });
+    onEnd?.({ transcript: `${finalText} ${lastInterim}`.trim() });
   };
 
   return {

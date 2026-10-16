@@ -1,0 +1,10 @@
+{
+  "node": true,
+  "browser": true,
+  "es6": true,
+  "white": true,
+  "bitwise": true,
+  "forin": true,
+  "plusplus": true
+}
+

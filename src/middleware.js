@@ -36,14 +36,13 @@ export async function middleware(request) {
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
-    url.pathname = '/login';
+    url.pathname = '/';
     return NextResponse.redirect(url);
   }
 
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone();
-    // Setelah login selalu lewat pilihan dulu: Pengguna atau Relawan.
-    url.pathname = '/app/pilih';
+    url.pathname = '/app/voice';
     return NextResponse.redirect(url);
   }
 

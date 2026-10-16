@@ -1,9 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowDown, ArrowRight } from 'lucide-react';
 import { MotionConfig, motion } from 'motion/react';
 import GenerativeArt from '@/components/GenerativeArt';
+import Logo from '@/components/Logo';
+import { useSession } from '@/components/SessionProvider';
+import AuthModal from '@/components/AuthModal';
 
 // ===== Halaman depan: hero malam + bagian "cara kerja" editorial =====
 // Tata letak mengikuti referensi editorial: nav tiga zona (merek / tautan / aksi),
@@ -51,6 +55,17 @@ const reveal = (delay = 0) => ({
 });
 
 export default function LandingPage() {
+  const { user, profile } = useSession();
+  const [authModal, setAuthModal] = useState({ open: false, mode: 'login' });
+
+  const startHref = user ? (profile?.role === 'admin' ? '/app/admin' : '/app/voice') : '#';
+  const startLabel = user ? 'Buka ruangmu' : 'Mulai bercerita';
+
+  function scrollToCara(e) {
+    e?.preventDefault();
+    document.getElementById('cara')?.scrollIntoView({ behavior: 'smooth' });
+  }
+
   return (
     <MotionConfig reducedMotion="user">
       <div className="min-h-dvh">
@@ -75,33 +90,39 @@ export default function LandingPage() {
           />
 
           <div className="relative mx-auto flex min-h-dvh max-w-6xl flex-col px-6">
-            <motion.header className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 py-5" {...rise(0)}>
+            <motion.header className="flex items-center justify-between py-6" {...rise(0)}>
               <Link
                 href="/"
-                className="flex items-center gap-2 justify-self-start font-semibold tracking-tight text-on-dark"
+                className="flex items-center gap-2.5 font-semibold text-lg tracking-tight text-on-dark transition hover:opacity-90"
               >
-                <span aria-hidden="true">🌿</span>
-                hearme
+                <Logo size={34} />
+                <span>hearme</span>
               </Link>
-              <nav className="hidden items-center gap-7 justify-self-center text-sm text-on-dark-body md:flex">
-                <a href="#cara" className="transition hover:text-on-dark">
-                  Cara kerja
-                </a>
-                <Link href="/login" className="transition hover:text-on-dark">
-                  Masuk
-                </Link>
-              </nav>
-              <div className="flex items-center gap-3 justify-self-end">
-                <Link href="/login" className="text-sm text-on-dark-body transition hover:text-on-dark md:hidden">
-                  Masuk
-                </Link>
-                <Link
-                  href="/register"
-                  className="rounded-full border border-on-dark/40 px-4 py-2 text-sm font-medium text-on-dark transition hover:bg-on-dark/10"
+              <nav className="flex items-center gap-6 text-sm text-on-dark-body">
+                <button
+                  type="button"
+                  onClick={scrollToCara}
+                  className="cursor-pointer transition hover:text-on-dark"
                 >
-                  Mulai bercerita
-                </Link>
-              </div>
+                  Cara kerja
+                </button>
+                {user ? (
+                  <Link
+                    href={startHref}
+                    className="rounded-full bg-on-dark/15 px-4 py-1.5 text-xs font-medium text-on-dark transition hover:bg-on-dark/25"
+                  >
+                    Buka ruang
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setAuthModal({ open: true, mode: 'login' })}
+                    className="cursor-pointer transition hover:text-on-dark"
+                  >
+                    Masuk
+                  </button>
+                )}
+              </nav>
             </motion.header>
 
             <div className="flex flex-1 flex-col items-center justify-center py-10 text-center">
@@ -116,39 +137,48 @@ export default function LandingPage() {
               <motion.p className="mt-6 max-w-xl text-on-dark-body" {...rise(0.18)}>
                 Dukungan sebaya untuk mahasiswa — tanpa nama asli, tanpa terburu-buru.
               </motion.p>
-              <motion.div className="mt-9 flex flex-wrap items-center justify-center gap-3" {...rise(0.28)}>
-                <MotionLink
-                  href="/register"
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="inline-flex min-h-12 items-center gap-2 rounded-full bg-on-dark px-6 text-sm font-medium text-ink transition-colors hover:bg-[#f2efe9]"
-                >
-                  Mulai bercerita
-                  <ArrowRight className="size-4" />
-                </MotionLink>
-                <motion.a
-                  href="#cara"
-                  whileHover={{ y: -2 }}
-                  className="inline-flex min-h-12 items-center rounded-full border border-on-dark/35 px-6 text-sm font-medium text-on-dark transition-colors hover:bg-on-dark/10"
-                >
-                  Lihat cara kerjanya
-                </motion.a>
+              <motion.div className="mt-9 flex items-center justify-center" {...rise(0.28)}>
+                {user ? (
+                  <MotionLink
+                    href={startHref}
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="inline-flex min-h-12 items-center gap-2.5 rounded-full bg-on-dark px-7 text-sm font-medium text-ink shadow-sm transition-colors hover:bg-[#f2efe9]"
+                  >
+                    {startLabel}
+                    <ArrowRight className="size-4" />
+                  </MotionLink>
+                ) : (
+                  <motion.button
+                    type="button"
+                    onClick={() => setAuthModal({ open: true, mode: 'register' })}
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="inline-flex min-h-12 items-center gap-2.5 rounded-full bg-on-dark px-7 text-sm font-medium text-ink shadow-sm transition-colors hover:bg-[#f2efe9] cursor-pointer"
+                  >
+                    {startLabel}
+                    <ArrowRight className="size-4" />
+                  </motion.button>
+                )}
               </motion.div>
             </div>
 
-            <motion.p
-              className="flex items-center justify-center gap-2 pb-10 text-[11px] uppercase tracking-[0.24em] text-on-dark-body/70"
-              {...rise(0.4)}
-            >
-              Gulir untuk membaca
-              <motion.span
-                aria-hidden="true"
-                animate={{ y: [0, 4, 0] }}
-                transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+            <motion.div className="flex justify-center pb-10" {...rise(0.38)}>
+              <button
+                type="button"
+                onClick={scrollToCara}
+                className="group flex cursor-pointer items-center gap-2 text-[11px] font-medium uppercase tracking-[0.22em] text-on-dark-body/60 transition hover:text-on-dark"
               >
-                <ArrowDown className="size-3.5" />
-              </motion.span>
-            </motion.p>
+                Gulir untuk membaca
+                <motion.span
+                  aria-hidden="true"
+                  animate={{ y: [0, 4, 0] }}
+                  transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+                >
+                  <ArrowDown className="size-3.5 transition group-hover:translate-y-0.5" />
+                </motion.span>
+              </button>
+            </motion.div>
           </div>
         </section>
 
@@ -192,7 +222,7 @@ export default function LandingPage() {
 
         {/* ===== Penutup ===== */}
         <section className="relative overflow-hidden bg-night text-on-dark">
-          <div className="mx-auto max-w-6xl px-6 py-16 text-center md:py-20">
+          <div className="mx-auto max-w-6xl px-6 py-20 text-center">
             <motion.h2
               className="font-display text-[clamp(1.7rem,3.6vw,2.6rem)] leading-tight text-balance"
               {...reveal(0)}
@@ -202,25 +232,51 @@ export default function LandingPage() {
             <motion.p className="mx-auto mt-4 max-w-md text-on-dark-body" {...reveal(0.08)}>
               Tanpa nama asli. Kamu bisa berhenti kapan saja.
             </motion.p>
-            <motion.div className="mt-8 flex flex-wrap items-center justify-center gap-3" {...reveal(0.16)}>
-              <MotionLink
-                href="/register"
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                className="inline-flex min-h-12 items-center gap-2 rounded-full bg-on-dark px-6 text-sm font-medium text-ink transition-colors hover:bg-[#f2efe9]"
-              >
-                Mulai bercerita
-                <ArrowRight className="size-4" />
-              </MotionLink>
-              <MotionLink
-                href="/login"
-                className="inline-flex min-h-12 items-center rounded-full border border-on-dark/35 px-6 text-sm font-medium text-on-dark transition-colors hover:bg-on-dark/10"
-              >
-                Sudah punya ruang
-              </MotionLink>
+            <motion.div className="mt-8 flex flex-col items-center justify-center gap-4" {...reveal(0.16)}>
+              {user ? (
+                <MotionLink
+                  href={startHref}
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="inline-flex min-h-12 items-center gap-2.5 rounded-full bg-on-dark px-7 text-sm font-medium text-ink shadow-sm transition-colors hover:bg-[#f2efe9]"
+                >
+                  {startLabel}
+                  <ArrowRight className="size-4" />
+                </MotionLink>
+              ) : (
+                <motion.button
+                  type="button"
+                  onClick={() => setAuthModal({ open: true, mode: 'register' })}
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="inline-flex min-h-12 items-center gap-2.5 rounded-full bg-on-dark px-7 text-sm font-medium text-ink shadow-sm transition-colors hover:bg-[#f2efe9] cursor-pointer"
+                >
+                  {startLabel}
+                  <ArrowRight className="size-4" />
+                </motion.button>
+              )}
+              {!user && (
+                <p className="text-xs text-on-dark-body/75">
+                  Sudah punya ruang?{' '}
+                  <button
+                    type="button"
+                    onClick={() => setAuthModal({ open: true, mode: 'login' })}
+                    className="cursor-pointer font-medium text-on-dark underline underline-offset-4 transition hover:text-white"
+                  >
+                    Masuk
+                  </button>
+                </p>
+              )}
             </motion.div>
           </div>
         </section>
+
+        {/* Modal Auth di dalam halaman (Mencegah kebocoran URL /login atau /register di address bar) */}
+        <AuthModal
+          isOpen={authModal.open}
+          initialMode={authModal.mode}
+          onClose={() => setAuthModal((prev) => ({ ...prev, open: false }))}
+        />
       </div>
     </MotionConfig>
   );

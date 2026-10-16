@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "seed": "node scripts/seed.mjs",
+    "build:journal": "node scripts/build-journal-knowledge.mjs",
     "lint": "next lint"
   },
   "dependencies": {
@@ -15,6 +16,7 @@
     "lucide-react": "latest",
     "motion": "^14.2.0",
     "next": "^15.0.0",
+    "pdf-parse": "^2.4.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

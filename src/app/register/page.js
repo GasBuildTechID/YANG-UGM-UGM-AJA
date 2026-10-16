@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { ArrowLeft, Sparkles } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowLeft, ArrowRight, HeartHandshake, Sparkles } from 'lucide-react';
+import Logo from '@/components/Logo';
 import { createClient } from '@/lib/supabase/client';
 
 export default function RegisterPage() {
@@ -13,9 +14,16 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [consent, setConsent] = useState(false);
+  const [isVolunteer, setIsVolunteer] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.pathname.includes('/register')) {
+      window.history.replaceState(null, '', '/');
+    }
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -25,22 +33,55 @@ export default function RegisterPage() {
     }
     setBusy(true);
     setError('');
-    const { data, error: err } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { display_name: displayName } },
-    });
-    setBusy(false);
-    if (err) {
-      setError(err.message);
-      return;
+
+    try {
+      // 1. Coba daftarkan melalui API server (bypass email rate limit Supabase)
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          displayName,
+          roleIntent: isVolunteer ? 'volunteer' : 'user',
+        }),
+      });
+
+      const resData = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(resData.error || 'Gagal mendaftarkan akun.');
+      }
+
+      // 2. Login otomatis setelah akun berhasil dibuat
+      const { error: loginErr } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (loginErr) {
+        setError('Akun berhasil dibuat. Silakan gunakan formulir masuk.');
+        setBusy(false);
+        return;
+      }
+
+      // 3. Arahkan sesuai peran yang dipilih (URL bersih tanpa query params)
+      if (isVolunteer) {
+        router.push('/app/volunteer');
+      } else {
+        router.push('/app/voice');
+      }
+      router.refresh();
+    } catch (err) {
+      const msg = err.message || '';
+      if (msg.toLowerCase().includes('rate limit')) {
+        setError('Batas pengiriman email Supabase tercapai. Silakan coba lagi beberapa saat atau masuk langsung jika akun sudah terdaftar.');
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setBusy(false);
     }
-    if (!data.session) {
-      setCheckEmail(true);
-      return;
-    }
-    router.push('/app/pilih');
-    router.refresh();
   }
 
   return (
@@ -52,9 +93,9 @@ export default function RegisterPage() {
         >
           <ArrowLeft className="size-3.5" /> Kembali ke beranda
         </Link>
-        <div className="flex items-center gap-2 font-bold text-frost">
-          <span className="logo-mark">🌿</span>
-          hearme
+        <div className="flex items-center gap-2.5 font-bold text-frost">
+          <Logo size={28} />
+          <span>hearme</span>
         </div>
         <h1 className="mt-5 font-display text-2xl font-light">
           Buat ruangmu <span className="text-gradient italic">malam ini.</span>
@@ -114,19 +155,58 @@ export default function RegisterPage() {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-            <label className="flex items-start gap-2 text-sm text-fog">
-              <input
-                type="checkbox"
-                className="mt-0.5 size-4 accent-indigo-400"
-                checked={consent}
-                onChange={(e) => setConsent(e.target.checked)}
-              />
-              <span>Aku menyetujui aturan ruang.</span>
-            </label>
+            <div className="space-y-3 pt-1">
+              <label className="flex items-start gap-2 text-sm text-fog cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4 accent-indigo-400"
+                  checked={consent}
+                  onChange={(e) => setConsent(e.target.checked)}
+                />
+                <span>Aku menyetujui aturan ruang.</span>
+              </label>
+
+              <label
+                className={`flex items-start gap-2.5 rounded-2xl border p-3.5 text-sm transition cursor-pointer ${
+                  isVolunteer
+                    ? 'border-indigo-300/40 bg-indigo-300/10 text-frost'
+                    : 'border-white/10 bg-white/4 text-fog hover:border-white/20 hover:bg-white/6'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4 accent-indigo-400"
+                  checked={isVolunteer}
+                  onChange={(e) => setIsVolunteer(e.target.checked)}
+                />
+                <div className="leading-snug">
+                  <span className="flex items-center gap-1.5 font-medium text-frost">
+                    <HeartHandshake className="size-4 text-aurora-indigo" />
+                    Daftar sebagai Relawan Pendamping
+                  </span>
+                  <p className="mt-1 text-xs text-fog">
+                    Centang jika kamu ingin menjadi relawan. Setelah akun dibuat, kamu langsung mengisi formulir &amp; dokumen pendukung.
+                  </p>
+                </div>
+              </label>
+            </div>
+
             {error && <p className="rounded-xl bg-rose-400/10 p-3 text-sm text-rose-200">{error}</p>}
             <button type="submit" className="btn-primary w-full" disabled={busy}>
-              <Sparkles className="size-4" />
-              {busy ? 'Menyiapkan ruang…' : 'Buat ruangku'}
+              {busy ? (
+                'Menyiapkan ruang…'
+              ) : isVolunteer ? (
+                <>
+                  <Sparkles className="size-4" />
+                  Buat ruang &amp; isi berkas relawan
+                  <ArrowRight className="size-4" />
+                </>
+              ) : (
+                <>
+                  <Sparkles className="size-4" />
+                  Buat ruangku
+                </>
+              )}
             </button>
           </form>
         )}

@@ -20,6 +20,8 @@ import {
   UserRound,
   Users,
 } from 'lucide-react';
+import WaveDots from '@/components/WaveDots';
+import Logo from '@/components/Logo';
 import { createClient } from '@/lib/supabase/client';
 import { useSession } from '@/components/SessionProvider';
 import {
@@ -219,7 +221,7 @@ export default function AdminPage() {
   if (loading || loadingPage) {
     return (
       <div className="grid min-h-dvh place-items-center">
-        <Loader2 className="size-6 animate-spin text-aurora-teal" />
+        <WaveDots size="lg" label="Memuat dashboard admin..." className="text-aurora-teal" />
       </div>
     );
   }
@@ -230,8 +232,8 @@ export default function AdminPage() {
         <div className="card max-w-lg text-center">
           <h1 className="text-lg font-bold text-frost">Halaman khusus admin</h1>
           <p className="mt-1 text-sm text-fog">Akunmu bukan admin.</p>
-          <Link href="/app/pilih" className="btn-secondary mt-4">
-            Kembali ke pilihan
+          <Link href="/app" className="btn-secondary mt-4">
+            Kembali ke beranda
           </Link>
         </div>
       </div>
@@ -315,8 +317,8 @@ export default function AdminPage() {
     <div className="min-h-dvh lg:flex">
       {/* ============ Sidebar (desktop) ============ */}
       <aside className="hidden border-r border-white/8 bg-midnight/40 backdrop-blur-xl lg:flex lg:w-64 lg:flex-col">
-        <div className="flex items-center gap-2 px-5 py-4 font-bold text-frost">
-          <span className="logo-mark">🌿</span>
+        <div className="flex items-center gap-2.5 px-5 py-4 font-bold text-frost">
+          <Logo size={28} />
           <span>hearme</span>
         </div>
 
@@ -356,7 +358,7 @@ export default function AdminPage() {
             type="button"
             onClick={async () => {
               await supabase.auth.signOut();
-              window.location.href = '/login';
+              window.location.href = '/';
             }}
             className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-fog transition hover:bg-white/5 hover:text-frost"
           >
@@ -370,7 +372,9 @@ export default function AdminPage() {
         <header className="sticky top-0 z-30 border-b border-white/8 bg-void/70 backdrop-blur-xl">
           <div className="flex h-14 items-center justify-between gap-3 px-4">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="logo-mark lg:hidden">🌿</span>
+              <span className="lg:hidden">
+                <Logo size={24} />
+              </span>
               <div className="hidden min-w-0 lg:block">
                 <h1 className="truncate text-sm font-bold text-frost">{current.label}</h1>
                 <p className="truncate text-[11px] text-mist">{current.hint}</p>
@@ -398,7 +402,7 @@ export default function AdminPage() {
                 type="button"
                 onClick={async () => {
                   await supabase.auth.signOut();
-                  window.location.href = '/login';
+                  window.location.href = '/';
                 }}
                 className="btn-ghost lg:hidden"
                 title="Keluar"

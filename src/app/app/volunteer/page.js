@@ -5,7 +5,23 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, DoorOpen, FileCheck2, HeartHandshake, Loader2, Paperclip, ShieldCheck, Upload, UserPlus, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  DoorOpen,
+  FileCheck2,
+  HeartHandshake,
+  Loader2,
+  Paperclip,
+  ShieldCheck,
+  Sparkles,
+  Upload,
+  UserPlus,
+  X,
+} from 'lucide-react';
+import WaveDots from '@/components/WaveDots';
 import { createClient } from '@/lib/supabase/client';
 import { useSession } from '@/components/SessionProvider';
 import { APPLICATION_LABELS, PROOF_TYPE_LABELS, formatDateTime } from '@/lib/labels';
@@ -114,7 +130,7 @@ export default function VolunteerPage() {
   if (loading || (user && loadingPage)) {
     return (
       <div className="grid place-items-center py-24">
-        <Loader2 className="size-6 animate-spin text-aurora-teal" />
+        <WaveDots size="lg" label="Memuat formulir relawan..." className="text-aurora-teal" />
       </div>
     );
   }
@@ -125,7 +141,7 @@ export default function VolunteerPage() {
         <HeartHandshake className="mx-auto size-8 text-aurora-indigo" />
         <h1 className="mt-3 text-lg font-bold text-frost">Masuk dulu ya</h1>
         <p className="mt-1 text-sm text-fog">Halaman relawan terbuka setelah kamu masuk.</p>
-        <Link href="/login" className="btn-primary mt-4 inline-flex">
+        <Link href="/" className="btn-primary mt-4 inline-flex">
           Masuk
         </Link>
       </div>
@@ -136,10 +152,10 @@ export default function VolunteerPage() {
     <div className="mx-auto max-w-2xl space-y-4">
       <div>
         <Link
-          href="/app/pilih"
+          href="/app"
           className="mb-2 inline-flex items-center gap-1.5 text-xs font-medium text-fog hover:text-frost"
         >
-          <ArrowLeft className="size-3.5" /> Kembali ke pilihan peran
+          <ArrowLeft className="size-3.5" /> Kembali ke beranda
         </Link>
         <h1 className="text-2xl font-bold text-frost">Relawan pendamping</h1>
         <p className="mt-1 text-fog">
@@ -151,10 +167,10 @@ export default function VolunteerPage() {
       {!application && (
         <div className="card">
           <h2 className="flex items-center gap-2 text-lg font-bold text-frost">
-            <UserPlus className="size-5" /> Daftar sebagai relawan
+            <UserPlus className="size-5" /> Formulir Dokumen Pendukung Relawan
           </h2>
           <p className="mt-1 text-sm text-fog">
-            Isi formulir & validasi kode etik. Setelah itu pendaftaranmu menunggu verifikasi admin.
+            Isi formulir &amp; lampirkan 1 bukti kualifikasi (STR, Ijazah, atau Sertifikat). Setelah dikirim, akunmu langsung menunggu verifikasi admin.
           </p>
           <form onSubmit={submitApplication} className="mt-4 space-y-4">
             <div>
@@ -266,7 +282,83 @@ export default function VolunteerPage() {
         </div>
       )}
 
-      {application && (
+      {application && application.status === 'pending' && (
+        <div className="card space-y-5">
+          <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:items-start sm:text-left">
+            <div className="grid size-12 shrink-0 place-items-center rounded-2xl border border-amber-300/35 bg-amber-300/10 text-amber-200">
+              <Clock className="size-6 animate-pulse" />
+            </div>
+            <div className="flex-1">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-xl font-bold text-frost">Dashboard Verifikasi Relawan</h2>
+                <span className="chip-amber">Menunggu Verifikasi Admin</span>
+              </div>
+              <p className="mt-1 text-sm text-fog leading-relaxed">
+                Dokumen bukti kualifikasimu telah berhasil diterima. Tim admin kampus sedang melakukan verifikasi data kelayakan pendampingan sebaya.
+              </p>
+            </div>
+          </div>
+
+          {/* Timeline tahapan verifikasi */}
+          <div className="rounded-2xl border border-white/10 bg-white/4 p-4 space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-mist">Progres Pendaftaran</h3>
+            <div className="space-y-2.5 text-xs">
+              <div className="flex items-center gap-2.5 text-teal-100">
+                <CheckCircle2 className="size-4 shrink-0 text-aurora-teal" />
+                <span>Akun relawan berhasil terdaftar</span>
+              </div>
+              <div className="flex items-center gap-2.5 text-teal-100">
+                <CheckCircle2 className="size-4 shrink-0 text-aurora-teal" />
+                <span>
+                  Formulir &amp; dokumen pendukung terkirim ({formatDateTime(application.created_at)})
+                </span>
+              </div>
+              <div className="flex items-center gap-2.5 font-medium text-amber-200">
+                <Clock className="size-4 shrink-0 text-amber-300 animate-spin" />
+                <span>Sedang diverifikasi oleh admin (estimasi maksimal 1×24 jam)</span>
+              </div>
+              <div className="flex items-center gap-2.5 text-mist">
+                <DoorOpen className="size-4 shrink-0 opacity-40" />
+                <span>Akses Lobby Relawan akan otomatis aktif setelah disetujui</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Info berkas yang dilampirkan */}
+          {application.proof_path && (
+            <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-fog">
+              <div className="flex items-center gap-2">
+                <Paperclip className="size-4 text-aurora-teal" />
+                <span>
+                  Dokumen bukti: <strong className="text-frost">{PROOF_TYPE_LABELS[application.proof_type] || 'Dokumen Kualifikasi'}</strong>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={openOwnProof}
+                className="font-semibold text-aurora-teal underline-offset-2 hover:underline"
+              >
+                Lihat Berkas
+              </button>
+            </div>
+          )}
+
+          {/* Opsi akses bagi relawan sambil menunggu */}
+          <div className="border-t border-white/10 pt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className="text-xs text-mist text-center sm:text-left">
+              Sambil menunggu verifikasi selesai, kamu tetap bisa menggunakan hearme sebagai pengguna biasa.
+            </p>
+            <Link
+              href="/app"
+              className="btn-primary w-full sm:w-auto inline-flex items-center justify-center gap-1.5 text-xs whitespace-nowrap"
+            >
+              Ke Halaman Pengguna <ArrowRight className="size-3.5" />
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {application && application.status !== 'pending' && (
         <div className="card">
           <div className="flex items-center justify-between">
             <h2 className="font-bold text-frost">Status pendaftaranmu</h2>
@@ -274,9 +366,7 @@ export default function VolunteerPage() {
               className={
                 application.status === 'approved'
                   ? 'chip-teal'
-                  : application.status === 'pending'
-                    ? 'chip-amber'
-                    : 'chip-rose'
+                  : 'chip-rose'
               }
             >
               {APPLICATION_LABELS[application.status]}
@@ -294,11 +384,6 @@ export default function VolunteerPage() {
               >
                 Lihat
               </button>
-            </p>
-          )}
-          {application.status === 'pending' && (
-            <p className="mt-3 rounded-xl bg-amber-400/10 p-3 text-sm text-amber-200">
-              Menunggu verifikasi admin. Sambil menunggu, kamu tetap bisa memakai hearme sebagai pengguna biasa.
             </p>
           )}
           {application.status === 'rejected' && (

@@ -3,7 +3,8 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Clock, HeartHandshake, Loader2, MessagesSquare, RefreshCcw, Users, XCircle } from 'lucide-react';
+import { Clock, HeartHandshake, MessagesSquare, RefreshCcw, Users, XCircle } from 'lucide-react';
+import WaveDots from '@/components/WaveDots';
 import { createClient } from '@/lib/supabase/client';
 import { useSession } from '@/components/SessionProvider';
 import { useCountdown } from '@/lib/hooks';
@@ -17,7 +18,7 @@ export default function QueuePage() {
     <Suspense
       fallback={
         <div className="grid place-items-center py-24">
-          <Loader2 className="size-6 animate-spin text-aurora-teal" />
+          <WaveDots size="lg" label="Menyiapkan antrean..." className="text-aurora-teal" />
         </div>
       }
     >
@@ -32,8 +33,29 @@ function QueueInner() {
   const searchParams = useSearchParams();
   const { user, loading } = useSession();
 
-  const initialRequestId = searchParams.get('request');
-  const initialMode = searchParams.get('mode') || 'group';
+  const [activeReqId, setActiveReqId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = JSON.parse(sessionStorage.getItem('activeQueue') || '{}');
+        return stored.requestId || searchParams.get('request') || null;
+      } catch {
+        return searchParams.get('request') || null;
+      }
+    }
+    return searchParams.get('request') || null;
+  });
+
+  const [activeMode, setActiveMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = JSON.parse(sessionStorage.getItem('activeQueue') || '{}');
+        return stored.mode || searchParams.get('mode') || 'group';
+      } catch {
+        return searchParams.get('mode') || 'group';
+      }
+    }
+    return searchParams.get('mode') || 'group';
+  });
 
   const [request, setRequest] = useState(null);
   const [state, setState] = useState('loading'); // loading | waiting | expired | matched | none | left
@@ -63,6 +85,7 @@ function QueueInner() {
 
         if (data?.status === 'matched' && data.session_id) {
           setState('matched');
+          if (typeof window !== 'undefined') sessionStorage.removeItem('activeQueue');
           router.push(`/app/session/${data.session_id}`);
           return;
         }
@@ -84,6 +107,7 @@ function QueueInner() {
             .eq('id', requestId)
             .maybeSingle();
           if (req?.status === 'matched' && req.session_id) {
+            if (typeof window !== 'undefined') sessionStorage.removeItem('activeQueue');
             router.push(`/app/session/${req.session_id}`);
             return;
           }
@@ -102,21 +126,30 @@ function QueueInner() {
   useEffect(() => {
     if (loading || !user) return undefined;
 
-    (async () => {
-      if (!initialRequestId) {
-        // tidak ada antrean di URL -> cek sesi berjalan, lalu antrean yang masih menunggu
-        const { data } = await supabase
-          .from('session_participants')
-          .select('session_id, sessions(id, mode, status)')
-          .eq('user_id', user.id)
-          .order('joined_at', { ascending: false })
-          .limit(3);
-        const active = (data || []).find((d) => d.sessions && ['scheduled', 'active'].includes(d.sessions.status));
-        if (active) {
-          router.replace(`/app/session/${active.session_id}`);
-          return;
-        }
+    // Bersihkan URL dari query parameters jika ada agar URL selalu bersih /app/queue
+    if (typeof window !== 'undefined' && window.location.search) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
 
+    (async () => {
+      let currentId = activeReqId;
+      let currentMode = activeMode;
+
+      // Cek sesi berjalan yang masih aktif/terjadwal
+      const { data } = await supabase
+        .from('session_participants')
+        .select('session_id, sessions(id, mode, status)')
+        .eq('user_id', user.id)
+        .order('joined_at', { ascending: false })
+        .limit(3);
+      const active = (data || []).find((d) => d.sessions && ['scheduled', 'active'].includes(d.sessions.status));
+      if (active) {
+        if (typeof window !== 'undefined') sessionStorage.removeItem('activeQueue');
+        router.replace(`/app/session/${active.session_id}`);
+        return;
+      }
+
+      if (!currentId) {
         const { data: waitingReq } = await supabase
           .from('support_requests')
           .select('id, mode, expires_at, status')
@@ -127,33 +160,45 @@ function QueueInner() {
           .limit(1)
           .maybeSingle();
         if (waitingReq) {
-          router.replace(`/app/queue?request=${waitingReq.id}&mode=${waitingReq.mode}`);
+          currentId = waitingReq.id;
+          currentMode = waitingReq.mode;
+          setActiveReqId(currentId);
+          setActiveMode(currentMode);
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('activeQueue', JSON.stringify({ requestId: currentId, mode: currentMode }));
+          }
+        } else {
+          setState('none');
           return;
         }
-
-        setState('none');
-        return;
       }
 
-      const { data: req } = await supabase.from('support_requests').select('*').eq('id', initialRequestId).maybeSingle();
-      setRequest(req || null);
-      await poll(initialRequestId, initialMode);
+      const { data: req } = await supabase.from('support_requests').select('*').eq('id', currentId).maybeSingle();
+      if (!req || req.status === 'cancelled') {
+        setState(req ? 'left' : 'none');
+        return;
+      }
+      setRequest(req);
+      await poll(currentId, currentMode);
     })();
 
-    if (!initialRequestId) return undefined;
-    const id = setInterval(() => poll(initialRequestId, initialMode), POLL_MS);
+    if (!activeReqId) return undefined;
+    const id = setInterval(() => poll(activeReqId, activeMode), POLL_MS);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, user, initialRequestId, initialMode]);
+  }, [loading, user, activeReqId, activeMode]);
 
   const remaining = useCountdown(request?.expires_at, {
-    onExpire: () => poll(initialRequestId, initialMode),
+    onExpire: () => poll(activeReqId, activeMode),
   });
 
   async function cancelQueue() {
     setBusy(true);
     if (request?.id) {
       await supabase.rpc('cancel_support_request', { p_request_id: request.id });
+    }
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('activeQueue');
     }
     setBusy(false);
     setState('left');
@@ -173,20 +218,27 @@ function QueueInner() {
       setError(err.message);
       return;
     }
-    router.replace(`/app/queue?request=${data.id}&mode=${mode}`);
+    setActiveReqId(data.id);
+    setActiveMode(mode);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('activeQueue', JSON.stringify({ requestId: data.id, mode }));
+      window.history.replaceState(null, '', '/app/queue');
+    }
+    setState('waiting');
+    await poll(data.id, mode);
   }
 
   if (loading || state === 'loading') {
     return (
       <div className="grid place-items-center py-24">
-        <Loader2 className="size-6 animate-spin text-aurora-teal" />
+        <WaveDots size="lg" label="Memeriksa antreanmu..." className="text-aurora-teal" />
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      {state === 'waiting' && initialMode === 'group' && (
+      {state === 'waiting' && activeMode === 'group' && (
         <div className="card text-center">
           <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-teal-300/10 text-aurora-teal">
             <Users className="size-7" />
@@ -219,7 +271,7 @@ function QueueInner() {
           </p>
 
           <div className="mt-5 flex justify-center gap-2">
-            <button type="button" className="btn-secondary" onClick={() => poll(initialRequestId, initialMode)} disabled={busy}>
+            <button type="button" className="btn-secondary" onClick={() => poll(activeReqId, activeMode)} disabled={busy}>
               <RefreshCcw className="size-4" /> Periksa sekarang
             </button>
             <button type="button" className="btn-danger" onClick={cancelQueue} disabled={busy}>
@@ -229,7 +281,7 @@ function QueueInner() {
         </div>
       )}
 
-      {state === 'waiting' && initialMode === 'one_to_one' && (
+      {state === 'waiting' && activeMode === 'one_to_one' && (
         <div className="card text-center">
           <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-teal-300/10 text-aurora-teal">
             <HeartHandshake className="size-7" />
@@ -244,51 +296,49 @@ function QueueInner() {
           </p>
 
           <div className="mt-5 flex justify-center gap-2">
-            <button type="button" className="btn-secondary" onClick={() => poll(initialRequestId, initialMode)} disabled={busy}>
+            <button type="button" className="btn-secondary" onClick={() => poll(activeReqId, activeMode)} disabled={busy}>
               <RefreshCcw className="size-4" /> Periksa sekarang
             </button>
             <button type="button" className="btn-danger" onClick={cancelQueue} disabled={busy}>
               <XCircle className="size-4" /> Batalkan
             </button>
           </div>
-
-
         </div>
       )}
 
       {state === 'matched' && (
-        <div className="card text-center">
-          <Loader2 className="mx-auto size-6 animate-spin text-aurora-teal" />
-          <p className="mt-2 text-sm text-fog">Seseorang menemani. Membuka ruang…</p>
+        <div className="card text-center py-8">
+          <WaveDots size="lg" className="mx-auto text-aurora-teal" />
+          <p className="mt-3 text-sm font-medium text-fog">Seseorang menemani. Membuka ruang…</p>
         </div>
       )}
 
       {state === 'expired' && (
         <div className="card">
           <h1 className="text-xl font-bold text-frost">
-            {initialMode === 'group' ? 'Lingkaran belum cukup' : 'Belum ada yang cocok'}
+            {activeMode === 'group' ? 'Lingkaran belum cukup' : 'Belum ada yang cocok'}
           </h1>
           <p className="mt-1 text-sm text-fog">
             Waktunya habis. Tidak apa-apa — kamu yang memilih langkah berikutnya.
           </p>
 
           <div className="mt-5 grid gap-2 sm:grid-cols-2">
-            <button type="button" className="btn-primary" onClick={() => retry(initialMode)} disabled={busy}>
+            <button type="button" className="btn-primary" onClick={() => retry(activeMode)} disabled={busy}>
               <Clock className="size-4" /> Tetap menunggu lagi
             </button>
             <button
               type="button"
               className="btn-secondary"
-              onClick={() => retry(initialMode === 'group' ? 'one_to_one' : 'group')}
+              onClick={() => retry(activeMode === 'group' ? 'one_to_one' : 'group')}
               disabled={busy}
             >
               <MessagesSquare className="size-4" />
-              {initialMode === 'group' ? 'Coba berdua dengan relawan' : 'Masuk lingkaran kecil'}
+              {activeMode === 'group' ? 'Coba berdua dengan relawan' : 'Masuk lingkaran kecil'}
             </button>
             <Link href="/app" className="btn-secondary">
               Kembali ke ringkasan
             </Link>
-            <Link href="/app/account#bantuan" className="btn-secondary">
+            <Link href="/app/account" className="btn-secondary">
               Lihat sumber bantuan
             </Link>
           </div>
@@ -303,7 +353,7 @@ function QueueInner() {
             <Link href="/app" className="btn-primary">
               Mulai lagi dari awal
             </Link>
-            <Link href="/app/account#bantuan" className="btn-secondary">
+            <Link href="/app/account" className="btn-secondary">
               Sumber bantuan
             </Link>
           </div>

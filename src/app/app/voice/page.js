@@ -25,7 +25,6 @@ import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   ArrowRight,
-  Loader2,
   Mic,
   MicOff,
   RotateCcw,
@@ -37,6 +36,8 @@ import {
 import { useSession } from '@/components/SessionProvider';
 import CrisisBanner from '@/components/CrisisBanner';
 import VoiceOrb from '@/components/VoiceOrb';
+import WaveDots from '@/components/WaveDots';
+import Logo from '@/components/Logo';
 import {
   VOICE_QUESTIONS,
   VOICE_GREETING,
@@ -45,6 +46,7 @@ import {
   acknowledgementFor,
   buildSummaryFromAnswers,
   matchOptionFromSpeech,
+  processVoiceTurn,
   INTAKE_STORAGE_KEY,
 } from '@/lib/intake';
 import {
@@ -62,9 +64,9 @@ import {
 const CRISIS_RE =
   /(bunuh diri|mengakhiri hidup|menyakiti diri|self[- ]?harm|ingin mati|pengen mati|ga mau hidup|tidak ingin hidup)/i;
 
-const SILENCE_MS = 1400; // jeda hening yang menandai giliran bicara selesai
-const MAX_LISTEN_MS = 8000; // batas atas satu giliran tanpa suara sama sekali
-const MAX_FAILURES = 2; // setelah ini, input teks ditawarkan
+const SILENCE_MS = 2200; // jeda hening yang lebih ramah — memberi ruang berpikir & bernapas
+const MAX_LISTEN_MS = 20000; // batas atas yang leluasa (20 detik) agar tidak memotong penjelasan
+const MAX_FAILURES = 2; // setelah ini, input teks ditawarkan otomatis
 
 function labelFor(question, value) {
   const opt = question?.options?.find((o) => o.value === value);
@@ -86,6 +88,7 @@ export default function VoiceIntakePage() {
   const [crisis, setCrisis] = useState(false);
   const [voiceOn, setVoiceOn] = useState(true);
   const [manualText, setManualText] = useState('');
+  const [manualOpen, setManualOpen] = useState(false);
   const [error, setError] = useState('');
   const [speechReady, setSpeechReady] = useState(false);
   const [ttsReady, setTtsReady] = useState(false);
@@ -293,9 +296,20 @@ export default function VoiceIntakePage() {
     setUserLine(text);
     setTurns((prev) => [...prev, { role: 'user', text }]);
 
-    const value = matchOptionFromSpeech(currentQuestion.key, text);
-    if (!value) {
-      // AI menanggapi dulu (seperti ChatGPT), lalu meminta ulang.
+    const isLast = turnIndex + 1 >= total;
+    const nextQuestion = isLast ? null : VOICE_QUESTIONS[turnIndex + 1].question;
+
+    // Proses giliran suara: toleransi kesalahan fonetik STT, tebak maksud dari konteks, dan jawab 2-3 kalimat santai tanpa markdown
+    const turnResult = processVoiceTurn({
+      text,
+      questionKey: currentQuestion.key,
+      history: turns,
+      answers,
+      nextQuestion,
+    });
+
+    if (!turnResult.ok || !turnResult.value) {
+      // AI meminta ulang dengan santai jika suara benar-benar kosong
       busyRef.current = false;
       setOrb('idle');
       const n = bumpFailure();
@@ -306,17 +320,19 @@ export default function VoiceIntakePage() {
       return;
     }
 
-    setAnswers((prev) => ({ ...prev, [currentQuestion.key]: value }));
+    const value = turnResult.value;
+    setAnswers((prev) => ({
+      ...prev,
+      [currentQuestion.key]: value,
+      [`raw_${currentQuestion.key}`]: text,
+    }));
     failuresRef.current = 0;
     setFailures(0);
     setMicProblem('');
     setOrb('thinking');
 
-    const isLast = turnIndex + 1 >= total;
-    const reply = acknowledgementFor(currentQuestion.key, value);
-    const nextQuestion = isLast ? null : VOICE_QUESTIONS[turnIndex + 1].question;
-    // satu tarikan napas: tanggapan + pertanyaan berikutnya dibacakan sekaligus
-    const line = nextQuestion ? `${reply} ${nextQuestion}` : `${reply} ${VOICE_CLOSING}`;
+    // Kalimat AI siap TTS (maksimal 2-3 kalimat, tanpa format markdown visual)
+    const line = turnResult.spokenReply;
 
     later(() => {
       busyRef.current = false;
@@ -403,7 +419,7 @@ export default function VoiceIntakePage() {
     stopSpeaking();
     clearTurnTimers();
     recognizerRef.current?.abort();
-    router.push('/app/pilih');
+    router.push('/app');
   }
 
   // Tombol "Selanjutnya": simpan hasil, lalu transisi beranimasi ke fitur berikutnya.
@@ -425,7 +441,7 @@ export default function VoiceIntakePage() {
   if (loading) {
     return (
       <div className="grid min-h-dvh place-items-center">
-        <Loader2 className="size-6 animate-spin text-aurora-teal" />
+        <WaveDots size="lg" label="Mempersiapkan ruang suara..." className="text-aurora-teal" />
       </div>
     );
   }
@@ -454,16 +470,14 @@ export default function VoiceIntakePage() {
               type="button"
               onClick={handleBack}
               className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-fog transition hover:border-white/20 hover:bg-white/10 hover:text-frost"
-              title="Kembali ke pilihan peran"
+              title="Kembali ke ringkasan"
             >
               <ArrowLeft className="size-3.5" />
               <span>Kembali</span>
             </button>
-            <span className="flex items-center gap-2 text-sm font-medium text-fog">
-              <span className="logo-mark">
-                <Sparkles className="size-4" />
-              </span>
-              hearme
+            <span className="flex items-center gap-2 text-sm font-semibold tracking-tight text-fog">
+              <Logo size={28} />
+              <span>hearme</span>
             </span>
           </div>
           {ttsReady && phase !== 'gate' && (
@@ -533,11 +547,15 @@ export default function VoiceIntakePage() {
 
             {/* kalimat AI yang sedang diucapkan — seperti transkrip ChatGPT voice */}
             <div className="space-y-2" aria-live="polite">
-              <p className="text-xs font-medium tracking-wide text-fog">
-                Pertanyaan {Math.min(index + 1, total)} dari {total}
-                {speaking && ' · aku sedang berbicara'}
-                {listening && ' · mendengarkanmu'}
-                {orb === 'thinking' && ' · aku menanggapi'}
+              <p className="flex items-center justify-center gap-2 text-xs font-medium tracking-wide text-fog">
+                <span>Pertanyaan {Math.min(index + 1, total)} dari {total}</span>
+                {speaking && <span>· aku sedang berbicara</span>}
+                {listening && <span>· mendengarkanmu</span>}
+                {orb === 'thinking' && (
+                  <span className="inline-flex items-center gap-1.5 text-aurora-teal">
+                    · aku menanggapi <WaveDots size="xs" />
+                  </span>
+                )}
               </p>
               <h2 className="font-display text-[clamp(1.3rem,3.4vw,1.8rem)] font-light leading-snug text-balance">
                 {aiLine || question?.question}
@@ -581,6 +599,22 @@ export default function VoiceIntakePage() {
               </button>
               <p className="text-xs text-mist">{status}</p>
 
+              {/* Opsi bantuan cepat: ketuk langsung opsi yang dimaksud */}
+              {question?.options && (
+                <div className="mx-auto flex max-w-lg flex-wrap justify-center gap-1.5 pt-1">
+                  {question.options.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => handleUserSpeech(opt.label)}
+                      className="rounded-full border border-white/10 bg-white/4 px-3 py-1.5 text-xs text-fog transition hover:border-aurora-teal/40 hover:bg-teal-300/10 hover:text-frost"
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {/* Sebab kegagalan mikrofon selalu ditampilkan — bukan diam-diam gagal. */}
               {micProblem && (
                 <div className="w-full max-w-md rounded-2xl border border-amber-300/25 bg-amber-300/10 p-3 text-left">
@@ -593,13 +627,13 @@ export default function VoiceIntakePage() {
                 </div>
               )}
 
-              {/* Jalan keluar: hanya saat suara memang tidak bisa dipakai. */}
-              {showTextFallback && (
+              {/* Jalan keluar: teks manual (selalu tersedia atas inisiatif pengguna atau saat gagal) */}
+              {(showTextFallback || manualOpen) ? (
                 <div className="w-full max-w-sm pt-2 text-left">
-                  <label className="label" htmlFor="manualAnswer">
+                  <label className="label text-xs" htmlFor="manualAnswer">
                     {speechReady
-                      ? 'Suara belum berhasil — tulis dulu di sini supaya bisa lanjut'
-                      : 'Browser ini belum bisa menangkap suara — tulis dulu di sini'}
+                      ? 'Tulis jawabanmu di sini:'
+                      : 'Browser ini belum bisa menangkap suara — tulis dulu di sini:'}
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -620,6 +654,14 @@ export default function VoiceIntakePage() {
                     </button>
                   </div>
                 </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setManualOpen(true)}
+                  className="pt-1 text-xs text-mist underline-offset-2 hover:text-fog hover:underline"
+                >
+                  Atau ketik jawaban secara manual
+                </button>
               )}
             </div>
 
@@ -691,7 +733,7 @@ export default function VoiceIntakePage() {
           <ShieldAlert className="size-3.5" />
           <span>
             Kalau ada pikiran untuk menyakiti diri,{' '}
-            <a className="underline" href="/app/account#bantuan">
+            <a className="underline" href="/app/account">
               jalur bantuan manusia
             </a>{' '}
             selalu terbuka.

@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, BookHeart, LifeBuoy, Loader2, ScrollText, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, BookHeart, LifeBuoy, ScrollText, ShieldAlert } from 'lucide-react';
+import WaveDots from '@/components/WaveDots';
 import { createClient } from '@/lib/supabase/client';
 import { useSession } from '@/components/SessionProvider';
 import { CRISIS_RESOURCES, REPORT_REASON_LABELS, SESSION_STATUS_LABELS, formatDateTime } from '@/lib/labels';
@@ -20,7 +22,7 @@ export default function AccountPage() {
   const [reports, setReports] = useState([]);
 
   const isAdmin = profile?.role === 'admin';
-  const backHref = isAdmin ? '/app/admin' : '/app/pilih';
+  const backHref = isAdmin ? '/app/admin' : '/app';
 
   useEffect(() => {
     if (profile?.display_name) setDisplayName(profile.display_name);
@@ -64,7 +66,7 @@ export default function AccountPage() {
   if (loading) {
     return (
       <div className="grid place-items-center py-24">
-        <Loader2 className="size-6 animate-spin text-aurora-teal" />
+        <WaveDots size="lg" label="Memuat akun..." className="text-aurora-teal" />
       </div>
     );
   }
@@ -117,7 +119,9 @@ export default function AccountPage() {
           <ScrollText className="size-5" /> Riwayat sesi
         </h2>
         {loadingHistory ? (
-          <Loader2 className="mt-3 size-5 animate-spin text-aurora-teal" />
+          <div className="py-4">
+            <WaveDots size="sm" label="Memuat riwayat sesi..." className="text-aurora-teal" />
+          </div>
         ) : history.length === 0 ? (
           <p className="mt-2 text-sm text-mist">Belum ada sesi.</p>
         ) : (
@@ -171,7 +175,7 @@ export default function AccountPage() {
         </ul>
       </div>
 
-      <div id="bantuan" className="card border-teal-300/40/25 bg-teal-300/10/60">
+      <div id="bantuan" className="card border-teal-300/25 bg-teal-300/10">
         <h2 className="flex items-center gap-2 font-bold text-teal-100">
           <LifeBuoy className="size-5" /> Sumber bantuan
         </h2>

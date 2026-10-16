@@ -6,7 +6,6 @@ import Link from 'next/link';
 import {
   Check,
   HeartHandshake,
-  Loader2,
   MessageCircle,
   Send,
   ShieldAlert,
@@ -20,6 +19,7 @@ import { useRealtimeBroadcast, useCountdown, useElapsed } from '@/lib/hooks';
 import { PHASE_LABELS, SESSION_GUIDE, formatClock, MOOD_LABELS } from '@/lib/labels';
 import SafetyActions from '@/components/SafetyActions';
 import GenerativeArt from '@/components/GenerativeArt';
+import WaveDots from '@/components/WaveDots';
 
 const PHASE_ORDER = ['opening', 'sharing', 'closing'];
 
@@ -142,7 +142,9 @@ export default function SessionRoomPage() {
     };
     setMessages((prev) => [...prev.slice(-199), msg]);
     setDraft('');
-    await broadcast.channel(`session:${sessionId}`).send({ type: 'broadcast', event: 'msg', payload: msg });
+    // broadcast adalah supabase client; kirim via channel yang sudah subscribe
+    const ch = broadcast.channel(`session:${sessionId}`);
+    await ch.send({ type: 'broadcast', event: 'msg', payload: msg });
   }
 
   // ---- aksi relawan pada tawaran 1-on-1 ----
@@ -260,7 +262,7 @@ export default function SessionRoomPage() {
   if (loading || loadingRoom) {
     return (
       <div className="grid place-items-center py-24">
-        <Loader2 className="size-6 animate-spin text-aurora-teal" />
+        <WaveDots size="lg" label="Membuka ruang sesi..." className="text-aurora-teal" />
       </div>
     );
   }
@@ -362,7 +364,7 @@ export default function SessionRoomPage() {
       {/* Relawan sudah menerima / memanggil — menunggu peserta mengonfirmasi */}
       {isOneToOne && isVolunteerSide && volunteerConsent && !memberConsent && !isEnded && (
         <div className="card text-center">
-          <Loader2 className="mx-auto size-5 animate-spin text-aurora-teal" />
+          <WaveDots size="md" className="mx-auto text-aurora-teal" />
           <p className="mt-2 text-sm text-fog">
             Kamu siap menemaninya. Menunggu peserta mengonfirmasi sebelum ruang bicara terbuka…
           </p>
@@ -394,7 +396,7 @@ export default function SessionRoomPage() {
                 </>
               ) : (
                 <>
-                  <Loader2 className="mx-auto size-5 animate-spin text-aurora-teal" />
+                  <WaveDots size="md" className="mx-auto text-aurora-teal" />
                   <p className="mt-2 text-sm text-fog">
                     Menunggu jawaban relawan… kalau tak ada, kamu dapat pilihan lain.
                   </p>
@@ -498,7 +500,10 @@ export default function SessionRoomPage() {
           </div>
 
           {typingNames.length > 0 && (
-            <p className="px-4 pb-1 text-xs text-mist">{typingNames.join(', ')} sedang menulis…</p>
+            <p className="flex items-center gap-2 px-4 pb-1 text-xs text-mist">
+              <span>{typingNames.join(', ')} sedang menulis</span>
+              <WaveDots size="xs" className="text-mist" />
+            </p>
           )}
 
           <form onSubmit={sendMessage} className="flex items-center gap-2 border-t border-white/8 p-3">
@@ -587,7 +592,7 @@ export default function SessionRoomPage() {
             <Link href="/app" className="btn-secondary">
               Kembali ke beranda
             </Link>
-            <Link href="/app/account#bantuan" className="btn-secondary">
+            <Link href="/app/account" className="btn-secondary">
               <ShieldAlert className="size-4" /> Lihat sumber bantuan
             </Link>
           </div>

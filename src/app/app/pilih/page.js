@@ -9,7 +9,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Feather, HeartHandshake, Loader2 } from 'lucide-react';
+import { ArrowRight, Feather, HeartHandshake } from 'lucide-react';
+import WaveDots from '@/components/WaveDots';
 import { createClient } from '@/lib/supabase/client';
 import { useSession } from '@/components/SessionProvider';
 import { APPLICATION_LABELS } from '@/lib/labels';
@@ -22,11 +23,6 @@ export default function PilihPage() {
   const [loadingApp, setLoadingApp] = useState(true);
 
   const isAdmin = profile?.role === 'admin';
-
-  // Admin tidak memilih peran: dia punya dashboard sendiri.
-  useEffect(() => {
-    if (isAdmin) router.replace('/app/admin');
-  }, [isAdmin, router]);
 
   useEffect(() => {
     if (!user) return;
@@ -44,10 +40,29 @@ export default function PilihPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  // Alihkan otomatis sesuai peran tanpa menampilkan opsi ganda
+  useEffect(() => {
+    if (!user || loading || loadingApp) return;
+    if (isAdmin) {
+      router.replace('/app/admin');
+      return;
+    }
+    if (application?.status === 'approved') {
+      router.replace('/app/lobby');
+      return;
+    }
+    if (application?.status === 'pending') {
+      router.replace('/app/volunteer');
+      return;
+    }
+    // Pengguna biasa langsung ke ruang suara untuk bercerita
+    router.replace('/app/voice');
+  }, [user, loading, loadingApp, isAdmin, application, router]);
+
   if (loading || isAdmin || (user && loadingApp)) {
     return (
       <div className="grid place-items-center py-24">
-        <Loader2 className="size-6 animate-spin text-aurora-teal" />
+        <WaveDots size="lg" label="Mengarahkan ruangmu..." className="text-aurora-teal" />
       </div>
     );
   }
@@ -56,7 +71,7 @@ export default function PilihPage() {
     return (
       <div className="card mx-auto max-w-lg text-center">
         <h1 className="text-lg font-bold text-frost">Masuk dulu ya</h1>
-        <Link href="/login" className="btn-primary mt-4 inline-flex">
+        <Link href="/" className="btn-primary mt-4 inline-flex">
           Masuk
         </Link>
       </div>
