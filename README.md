@@ -107,7 +107,7 @@ LOGIN / BIKIN AKUN → PILIHAN (Pengguna | Relawan | admin)
 | `relawan@demo.local` | Relawan | sudah `approved`, tinggal set “Siap menerima sesi” |
 | `admin@demo.local` | Admin | panel admin |
 
-Password semua akun demo: `DemoHearme123!` — **ganti sebelum dipakai publik**.
+Password semua akun demo: `DemoHearme123!`
 
 ## Peta implementasi
 
