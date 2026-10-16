@@ -1,6 +1,5 @@
 # hearme — Platform Peer Support Mahasiswa
 
-MVP hackathon untuk [implementasi_mvp_peer_support.md](./implementasi_mvp_peer_support.md):
 **pilihan** → **voice AI interaktif** (cerita dengan suara) → ringkasan kebutuhan yang bisa dikoreksi →
 **grup peer support** (3–4 orang, terstruktur) atau **1-on-1 dengan relawan approved** — dengan aturan
 keselamatan, lapor, blokir, dan jalur bantuan.
@@ -33,7 +32,7 @@ keselamatan, lapor, blokir, dan jalur bantuan.
 8. **⚡ Smart Role-Based Gateway & Dedicated Admin Dashboard**  
    Pemisahan alur login otomatis: Akun Admin langsung masuk ke panel dashboard manajemen relawan dan operasional tanpa melewati alur suara AI, Relawan diarahkan ke formulir verifikasi atau lobby, dan Pengguna langsung masuk ke ruang bercerita.
 
-## Alur baru (sesuai diagram tim)
+## Alur baru (sesuai diagram role)
 
 ```
 LOGIN / BIKIN AKUN → PILIHAN (Pengguna | Relawan | admin)
@@ -72,22 +71,6 @@ LOGIN / BIKIN AKUN → PILIHAN (Pengguna | Relawan | admin)
   masih menunggu atau relawan sudah memanggil.
 - **`/app/session/[id]`** — ruang bicara: user mengonfirmasi dulu sebelum 1-on-1 dimulai (tidak ada
   perpindahan otomatis).
-
-## Pengalaman: Warm Paper Editorial
-
-Bukan kuesioner medis yang kaku. Bahasa visualnya diadaptasi dari proyek Framer referensi
-(dibaca via MCP UnFramer) — editorial hangat, bukan UI klinis:
-
-- **Kertas hangat** (`#FBFAF8`) + tinta `#12100E`, garis rambut `#DEDAD3`, sapuan aurora krem
-  yang melayang lambat dan lapisan grain film.
-- **Ruang malam untuk suara**: layar voice (`/app/voice`) memakai latar `#16140F` dengan orb
-  bercahaya — momen bercerita terasa seperti lampu kecil di kegelapan.
-- **Katarsis → karya**: kata-kata pengguna melahirkan **Gema**, karya seni abstrak generatif (canvas
-  flow-field, deterministik dari teks — teks yang sama selalu melahirkan gema yang sama).
-  Muncul saat ringkasan kebutuhan dan di akhir sesi. Murni dekoratif (`aria-hidden`), tidak pernah disimpan.
-- Bahasa yang hangat dan manusiawi ("malam ini", "gema", "ruang") — bukan istilah klinis.
-- Semua animasi menghormati `prefers-reduced-motion`. Token desain lengkap ada di
-  [`DESIGN.md`](./DESIGN.md) (palet, tipografi Figtree, motion, a11y, do/don't).
 
 ## Stack
 
