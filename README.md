@@ -78,7 +78,7 @@ LOGIN / BIKIN AKUN → PILIHAN (Pengguna | Relawan | admin)
 - **Supabase** — Auth, Postgres + RLS, RPC matchmaking (semua transisi status di backend)
 - Chat sesi via **Realtime Broadcast** (ephemeral, **tanpa transkrip tersimpan**)
 
-## Setup (5 langkah)
+## Setup
 
 1. **Buat project Supabase** di https://supabase.com/dashboard.
 2. **Jalankan schema**: buka *SQL Editor* → tempel seluruh isi [`supabase/schema.sql`](./supabase/schema.sql) → Run.
@@ -99,7 +99,7 @@ LOGIN / BIKIN AKUN → PILIHAN (Pengguna | Relawan | admin)
    npm run dev
    ```
 
-## Akun demo (dari `npm run seed`)
+## Akun demo
 
 | Email | Peran | Catatan |
 |---|---|---|
@@ -109,24 +109,7 @@ LOGIN / BIKIN AKUN → PILIHAN (Pengguna | Relawan | admin)
 
 Password semua akun demo: `DemoHearme123!` — **ganti sebelum dipakai publik**.
 
-## Alur demo di panggung (≈4 menit)
-
-1. **1-on-1 (Buat Manggil)** — Login `relawan@demo.local` (jendela 1) → **Lobby** → set *Siap menerima sesi*.
-   Login `user@demo.local` (jendela 2) → **pilihan** → klik **Pengguna** → ketuk *Mulai mengobrol* → jawab
-   **3 pertanyaan dengan suara** (AI langsung menanggapi tiap jawaban dan melanjutkan sendiri) → **Selanjutnya**
-   (transisi beranimasi) → ringkasan bisa dikoreksi → pilih **1-on-1**.
-   Di lobby relawan muncul permintaan itu → klik **Panggil** → user mengonfirmasi → ngobrol → **Akhiri sesi** → check-in.
-2. **Grup** — Panel admin → **Konfigurasi** → `group_target_members = 2` (biar cepat).
-   Dua akun pengguna masuk antrean grup kategori sama → grup terbentuk otomatis.
-3. **Keselamatan** — Saat menulis indikasi risiko langsung, muncul **banner jalur bantuan** (bukan sekadar matchmaking).
-   Di dalam sesi: tombol **Laporkan** (kategori alasan) dan **Blokir**; admin meninjau di panel.
-4. **Relawan gabung grup** — Di lobby, relawan klik *Tawarkan diri mendampingi* pada grup aktif → peserta diberi
-   pilihan **setuju/tolak** dengan batas waktu (default 30 detik). Semua setuju → sesi jadi terapi grup; ditolak →
-   tetap grup peer support.
-5. **Timeout** — Biarkan antrean 1-on-1 lewat batas waktu (default 3 menit, ubah di panel admin) → muncul opsi:
-   tetap menunggu / masuk grup / kembali ke AI / sumber bantuan.
-
-## Peta implementasi (P0 §12 dokumen)
+## Peta implementasi
 
 | P0 | Implementasi |
 |---|---|
@@ -188,16 +171,6 @@ flowchart TD
     User -.->|"Signed Upload"| SStore
 ```
 
-### Mengapa Arsitektur Ini Tepat & Optimal untuk Vercel?
-1. **Zero Cold-Start Overhead**: Tidak membutuhkan container runtime terpisah (Express/FastAPI/Docker). Semua endpoint berupa Next.js Serverless Route Handlers yang di-scale otomatis oleh Vercel.
-2. **Solusi WebSocket Serverless**: Vercel Serverless Functions bersifat stateless dan tidak ditujukan untuk koneksi WebSocket persisten jangka panjang.Hearme mengatasi ini secara elegan dengan mengarahkan koneksi WebSocket realtime langsung dari browser klien ke kluster **Supabase Realtime (Elixir Phoenix Channels)**, sehingga komunikasi chat antar-mahasiswa berjalan instan tanpa membebani runtime Vercel.
-3. **Keamanan Kredensial (Zero-Leak)**:
-   - Secret rahasia (`SUPABASE_SERVICE_ROLE_KEY` dan `OPENAI_API_KEY`) hanya diakses di sisi server (`src/app/api/...` dan `src/lib/supabase/server.js`).
-   - Browser klien hanya menerima kredensial publik (`NEXT_PUBLIC_SUPABASE_URL` dan `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`) yang dilindungi penuh oleh aturan **Row Level Security (RLS)** PostgreSQL.
-4. **Optimalisasi Latensi (Region Singapore `sin1`)**: Melalui `vercel.json`, fungsi serverless ditempatkan pada region terdekat dengan pengguna Indonesia (`sin1`), memangkas latensi dari ~220ms (US) menjadi ~20ms.
-
----
-
 ## Struktur Folder & File Kunci
 
 ```
@@ -244,7 +217,7 @@ flowchart TD
 
 ---
 
-## Panduan Deployment Vercel & GitHub CI/CD
+## Panduan Deployment Vercel & GitHub 
 
 Platform Hearme terintegrasi secara otomatis dengan alur Git di Vercel:
 - **Production Deployment**: Otomatis ter-deploy ke domain produksi setiap kali ada `git push` ke branch utama (`main`).
@@ -261,10 +234,6 @@ Buka **Vercel Dashboard** → Pilih Project **Hearme** → **Settings** → **En
 | `OPENAI_API_KEY` | Production, Preview, Development | *(Opsional)* API Key OpenAI untuk grounding ilmiah LLM |
 | `OPENAI_MODEL` | Production, Preview, Development | *(Opsional)* Default: `gpt-4o-mini` |
 
-> [!IMPORTANT]
-> Di **Supabase Dashboard** (*Authentication -> URL Configuration*):
-> Pastikan **Site URL** diisi domain Vercel Anda (misal `https://hearme.vercel.app`), dan tambahkan `https://*-your-team.vercel.app/**` ke **Redirect URLs** agar login pada Preview Deployment berjalan mulus.
-
 ---
 
 ## Pengujian & Verifikasi Lokal
@@ -279,19 +248,6 @@ npm test
 npm run build
 ```
 
----
-
-## Keputusan Desain Penting (Sesuai Dokumen)
-
-- **Tidak ada transkrip tersimpan** — pesan hanya lewat Realtime Broadcast. Yang tersimpan hanya ringkasan
-  kebutuhan yang *dikonfirmasi pengguna* (`support_requests.needs_summary`).
-- **Moderasi Otomatis Terpasang** — pesan chat otomatis disaring dan disensor secara real-time demi menjaga ruang aman bagi seluruh mahasiswa.
-- **Admin tidak punya akses default ke percakapan**; RLS membatasi. Admin hanya melihat laporan & agregat.
-- **Semua transisi status di backend** (RPC `SECURITY DEFINER`), bukan hanya di UI.
-- **Relawan `approved` saja** yang bisa `available` (dicek trigger, bukan cuma UI).
-- **Relawan telat di grup tidak masuk otomatis** — butuh persetujuan semua peserta (batas waktu configurable).
-- **Angka 3 menit / kuota grup / durasi fase = konfigurasi** (`app_config`), bukan aturan universal.
-
 ## Konfigurasi operasional (`app_config`, bisa diubah dari panel admin)
 
 | Key | Default | Arti |
@@ -304,7 +260,7 @@ npm run build
 | `volunteer_join_consent_seconds` | 30 | waktu peserta menyetujui relawan gabung |
 | `session_durations` | 5/25/10 | menit fase pembukaan/berbagi/penutup |
 
-## Pertanyaan terbuka tim (§15 dokumen) — rekomendasi implementasi saat ini
+## Pertanyaan terbuka tim — rekomendasi implementasi saat ini
 
 - Grup tanpa relawan **boleh berjalan** (dianggap layanan tersendiri, bukan ruang tunggu relawan).
 - 3 menit = **batas pencarian relawan** (per request, bukan total).
@@ -316,12 +272,6 @@ npm run build
 
 Vercel: import repo, set env vars yang sama seperti `.env.local`, deploy.
 Pastikan **Site URL** Supabase diarahkan ke domain Vercel untuk redirect auth.
-
-## Standar Commit & Kontribusi
-
-Proyek ini menggunakan format standar **[Conventional Commits v1.0.0](https://www.conventionalcommits.org/)**.  
-Panduan lengkap tipe commit, cakupan (*scope*), dan aturan branch dapat dibaca di:
-👉 **[`COMMIT_CONVENTION.md`](./COMMIT_CONVENTION.md)**
 
 Untuk mengaktifkan template commit otomatis di Git lokal Anda:
 ```bash
